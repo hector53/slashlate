@@ -14,7 +14,7 @@ struct MenuBarView: View {
 
                 Spacer()
 
-                Text("M1.1")
+                Text("M1.2")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

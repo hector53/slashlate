@@ -9,8 +9,10 @@ making you leave the app you are using.
 
 ## Status
 
-**M1.1 - translation scopes** (on top of M1: real Spanish -> English
-translation via OpenRouter)
+**M1.2** - real Spanish -> English translation via OpenRouter (M1), with
+translation scopes (M1.1), visible status feedback and Electron app support
+(M1.2). See [`CHANGELOG.md`](CHANGELOG.md) and the known limitations in
+[`docs/M1_TEST_PLAN.md`](docs/M1_TEST_PLAN.md).
 
 M0 (global `///` detection, Accessibility permission, reading and replacing
 the focused field inline) has been validated on a real Mac.
@@ -232,9 +234,13 @@ scripts/
 - natural professional tone
 - safe failure behavior that preserves the original text
 
-### M1.1 - translation scopes (current)
+### M1.1 - translation scopes
 - `///` translates the whole field
 - `//.` translates only the current line
+
+### M1.2 - status feedback and Electron apps (current)
+- menu-bar icon and colored status for errors / discarded translations
+- Slack and other Electron apps via `AXManualAccessibility`
 
 ### M2 - product shell
 - configurable trigger

@@ -85,6 +85,14 @@ working exactly as before (re-run cases 1, 6 and 10).
   tested.
 - **Status feedback fix** (⚠️ icon + colored status) validated on a real Mac.
 
+## Known limitations (M1.2)
+
+| App | Status | Result |
+| --- | --- | --- |
+| ChatGPT macOS app (Electron) | `Could not read the focused text field (AX -25212)` | Not supported yet. Likely the `/` command menu takes focus. Text untouched. ChatGPT web works. |
+| Copilot chat in VS Code (Monaco) | `Trigger detected, but the focused field changed` | Not supported. Monaco exposes only part of its text unless `editor.accessibilitySupport` is `on` (not tested). Codex chat in VS Code works. |
+| Terminals (Claude Code CLI) | - | Not supported: no editable Accessibility text field. |
+
 ## What to record on failure
 
 - application and version;

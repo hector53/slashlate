@@ -7,6 +7,8 @@ Entries are grouped by milestone; there are no tagged releases yet.
 
 ## [Unreleased]
 
+## [M1.2] - 2026-10-02 - Visible status and Electron support
+
 ### Added
 - Menu-bar icon reflects state: `…` while translating, ⚠️ when the last
   attempt failed or was discarded and has not been seen yet (cleared when
@@ -25,8 +27,17 @@ Entries are grouped by milestone; there are no tagged releases yet.
 - Errors and discarded translations were effectively invisible: the status
   was small gray text only inside the popover (manual tests 8, 9, 10, 15).
 
-### Pending
-- ChatGPT macOS app not tested yet.
+### Known limitations
+- ChatGPT macOS app (`com.openai.codex`, Electron-based): `AX -25212`, no
+  focused element even with the Electron fallback. Suspected cause: typing
+  `/` opens ChatGPT's command menu, which takes focus. Text is left
+  untouched. ChatGPT in the browser works.
+- GitHub Copilot chat in VS Code (Monaco editor): `Trigger detected, but the
+  focused field changed`; Monaco only exposes part of its text to
+  Accessibility unless VS Code's `editor.accessibilitySupport` is `on`.
+  The Codex chat in VS Code works.
+- Terminals (e.g. Claude Code CLI) have no editable text field to read or
+  replace through Accessibility; not supported.
 
 ## [M1.1] - 2026-10-02 - Translation scopes
 
