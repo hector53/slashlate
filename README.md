@@ -9,24 +9,35 @@ making you leave the app you are using.
 
 ## Status
 
-**M0 - inline replacement prototype**
+**M1 - real Spanish -> English translation via OpenRouter**
 
-M0 deliberately does not call OpenRouter or any translation API yet. It
-validates the hardest part of the product first:
+M0 (global `///` detection, Accessibility permission, reading and replacing
+the focused field inline) has been validated on a real Mac.
 
-1. detect the global `///` trigger;
-2. read the currently focused text field through macOS Accessibility;
-3. verify that the field really ends in `///`;
-4. replace its contents inline.
-
-For M0, the replacement is the literal text:
+M1 replaces the M0 test string with a real translation:
 
 ```text
-TEST TRANSLATION
+ya terminé el cambio ///
+↓
+I've finished the change.
 ```
 
-If that works reliably on a real Mac, M1 will replace the test value with an
-OpenRouter translation.
+The model is called through the [OpenRouter](https://openrouter.ai) HTTP API
+(`openai/gpt-5-nano` by default, defined once in
+`Sources/Slashlate/Translation/OpenRouterClient.swift`).
+
+How a translation is applied safely:
+
+1. when `///` is typed, Slashlate captures the focused element and its value;
+2. the trigger is stripped only from the text sent to the model - the
+   visible field is not touched while waiting;
+3. when the translation arrives, Slashlate re-checks **the same element**:
+   it must still be focused and still contain exactly the original text;
+4. only then is the field replaced.
+
+If the request fails, times out, or you changed the text / field / app in the
+meantime, your original text (including `///`) stays exactly as it was and
+the reason is shown in the menu-bar popover.
 
 ## Requirements
 
@@ -44,13 +55,53 @@ make run
 This builds a release binary, assembles `build/Slashlate.app`, applies an
 ad-hoc signature, and launches it.
 
+Run the unit tests with:
+
+```bash
+make test
+```
+
 On first launch macOS should request Accessibility access. If necessary, open:
 
 **System Settings -> Privacy & Security -> Accessibility**
 
 and enable Slashlate. The menu-bar popover shows whether permission is active.
 
-## M0 smoke test
+## Configure the OpenRouter API key
+
+1. Create a key at <https://openrouter.ai/keys>.
+2. Click the Slashlate icon in the menu bar.
+3. Paste the key into **OpenRouter API Key** and click **Save API Key**.
+
+The key is stored in your login **macOS Keychain** (item
+"Slashlate OpenRouter API Key"). It is never written to `UserDefaults`, to
+disk in plain text, to logs, or to the repository. Use **Replace API Key** to
+change it.
+
+### Keeping permissions across rebuilds
+
+By default the app is ad-hoc signed. macOS identifies ad-hoc apps by their
+binary hash, so **every rebuild looks like a new app**: the Accessibility
+toggle stays on in System Settings but no longer applies, and Keychain asks
+for access again.
+
+To avoid this, sign with a stable identity (any "Apple Development"
+certificate works):
+
+```bash
+security find-identity -v -p codesigning   # pick an identity
+export SLASHLATE_SIGN_IDENTITY="Apple Development: you@example.com (TEAMID)"
+make run
+```
+
+If permission already looks granted but Slashlate says it is required, reset
+the stale entry and grant it again:
+
+```bash
+tccutil reset Accessibility dev.hectoracosta.slashlate
+```
+
+## Smoke test
 
 Open TextEdit or a browser text field and type:
 
@@ -58,16 +109,16 @@ Open TextEdit or a browser text field and type:
 hola mundo ///
 ```
 
-Expected result:
+After roughly a second the field becomes something like:
 
 ```text
-TEST TRANSLATION
+Hello world.
 ```
 
 Slashlate must **never** submit or send the text automatically.
 
-Compatibility findings belong in
-[`docs/M0_TEST_PLAN.md`](docs/M0_TEST_PLAN.md).
+Manual test cases live in [`docs/M1_TEST_PLAN.md`](docs/M1_TEST_PLAN.md);
+M0 compatibility notes are in [`docs/M0_TEST_PLAN.md`](docs/M0_TEST_PLAN.md).
 
 ## Project structure
 
@@ -78,6 +129,14 @@ Sources/Slashlate/
 ├── Keyboard/
 │   ├── KeyboardMonitor.swift
 │   └── TriggerDetector.swift
+├── Security/
+│   └── KeychainService.swift
+├── Translation/
+│   ├── TranslationService.swift   # provider boundary
+│   ├── OpenRouterClient.swift     # OpenRouter implementation + config
+│   ├── OpenRouterModels.swift
+│   ├── TranslationPrompt.swift
+│   └── TriggeredText.swift        # trigger stripping + replace safety check
 ├── UI/
 │   └── MenuBarView.swift
 ├── AppState.swift
@@ -85,6 +144,8 @@ Sources/Slashlate/
 
 Resources/
 └── Info.plist
+
+Tests/SlashlateTests/
 
 scripts/
 ├── build-app.sh
@@ -101,13 +162,13 @@ scripts/
 
 ## Roadmap
 
-### M0 - macOS inline replacement
+### M0 - macOS inline replacement (validated)
 - global `///` detection
 - Accessibility permission
 - focused-field read/write
 - real-app compatibility testing
 
-### M1 - translation
+### M1 - translation (current)
 - Spanish -> English
 - OpenRouter
 - fast, inexpensive model
@@ -117,7 +178,7 @@ scripts/
 ### M2 - product shell
 - configurable trigger
 - configurable hotkey
-- API key in macOS Keychain
+- full settings window (M1 ships only a minimal API key field)
 - launch at login
 - lightweight settings
 

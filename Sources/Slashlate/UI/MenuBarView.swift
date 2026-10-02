@@ -3,6 +3,8 @@ import SwiftUI
 
 struct MenuBarView: View {
     @ObservedObject var appState: AppState
+    @State private var apiKeyDraft = ""
+    @State private var isEditingAPIKey = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -12,7 +14,7 @@ struct MenuBarView: View {
 
                 Spacer()
 
-                Text("M0")
+                Text("M1")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -47,13 +49,13 @@ struct MenuBarView: View {
 
             Divider()
 
-            Text("M0 test")
-                .font(.caption)
-                .fontWeight(.semibold)
+            apiKeySection
+
+            Divider()
 
             Text(
-                "Type some text followed by " + appState.trigger +
-                ". Slashlate should replace the entire focused field with TEST TRANSLATION."
+                "Type Spanish text followed by " + appState.trigger +
+                ". Slashlate replaces the focused field with an English translation. It never sends the message."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -67,5 +69,44 @@ struct MenuBarView: View {
         }
         .padding(14)
         .frame(width: 320)
+    }
+
+    @ViewBuilder
+    private var apiKeySection: some View {
+        Text("OpenRouter API Key")
+            .font(.caption)
+            .fontWeight(.semibold)
+
+        if appState.hasAPIKey && !isEditingAPIKey {
+            Label("Configured", systemImage: "checkmark.circle.fill")
+
+            Button("Replace API Key") {
+                apiKeyDraft = ""
+                isEditingAPIKey = true
+            }
+        } else {
+            SecureField("sk-or-...", text: $apiKeyDraft)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(saveAPIKey)
+
+            HStack {
+                Button("Save API Key", action: saveAPIKey)
+                    .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                if appState.hasAPIKey {
+                    Button("Cancel") {
+                        apiKeyDraft = ""
+                        isEditingAPIKey = false
+                    }
+                }
+            }
+        }
+    }
+
+    private func saveAPIKey() {
+        if appState.saveAPIKey(apiKeyDraft) {
+            apiKeyDraft = ""
+            isEditingAPIKey = false
+        }
     }
 }

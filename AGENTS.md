@@ -13,20 +13,32 @@ The primary interaction for v0.1 is:
 4. Slashlate replaces the text in place;
 5. Slashlate never presses Enter or sends the message.
 
-## Current milestone: M0
+## Current milestone: M1
 
-M0 exists only to validate macOS integration. Do not add OpenRouter, model
-selection, multiple languages, accounts, analytics, or a large settings UI.
+M0 (global `///` detection, Accessibility permission, reading and replacing
+the focused field inline, menu-bar app) is validated on a real Mac. Do not
+rewrite that layer without a concrete reason.
 
-M0 must prove:
+M1 replaces the M0 test string with a real Spanish -> English translation
+through the OpenRouter HTTP API (`URLSession`, no SDK).
 
-- global `///` detection;
-- Accessibility permission handling;
-- reading the currently focused text field;
-- replacing that field inline;
-- no automatic send action.
+M1 rules:
 
-The expected M0 replacement is the literal string `TEST TRANSLATION`.
+- one model only, defined once in `OpenRouterConfiguration`;
+- the provider stays behind the `TranslationService` protocol;
+- the OpenRouter API key lives only in macOS Keychain;
+- capture the focused AX element + value on trigger, do not touch the visible
+  text while waiting, and replace only if that same element is still focused
+  and still contains exactly the original text;
+- on any error, leave the original text (including `///`) untouched and show
+  the error only in the menu-bar status;
+- at most one translation in flight;
+- request timeout of about 10 seconds.
+
+Not in M1: multiple languages, other or configurable triggers, configurable
+hotkeys, model/provider selectors, streaming, history, analytics, accounts,
+auto update, launch at login, clipboard fallback, onboarding, main window,
+telemetry.
 
 ## Technical direction
 
@@ -51,15 +63,17 @@ The expected M0 replacement is the literal string `TEST TRANSLATION`.
 
 ```bash
 swift build
+make test
 make app
 make run
 make clean
 ```
 
-## M0 validation
+## Validation
 
 Start with TextEdit, then test browser text areas and Electron apps. Record
-compatibility findings in `docs/M0_TEST_PLAN.md`.
+M0 compatibility findings in `docs/M0_TEST_PLAN.md` and M1 results in
+`docs/M1_TEST_PLAN.md`.
 
 A macOS integration change is not considered validated merely because it
 compiles. Accessibility behavior must be tested on a real Mac.

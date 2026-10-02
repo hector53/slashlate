@@ -1,8 +1,12 @@
 import ApplicationServices
 
-enum AccessibilityReplacementResult {
-    case replaced
-    case triggerNotAtEnd
+/// The focused text element and its value at the moment the trigger fired.
+///
+/// The element reference is kept so the translation is written back to this
+/// exact element, never to whatever happens to be focused later.
+struct FocusedTextField {
+    let element: AXUIElement
+    let value: String
 }
 
 enum AccessibilityServiceError: LocalizedError {
@@ -43,34 +47,15 @@ final class AccessibilityService {
         return AXIsProcessTrustedWithOptions(options)
     }
 
-    func replaceCurrentFieldIfTriggered(
-        trigger: String,
-        replacement: String
-    ) throws -> AccessibilityReplacementResult {
+    /// Reads the focused element and verifies it is a writable plain-text field.
+    /// Nothing is modified.
+    func captureFocusedTextField() throws -> FocusedTextField {
         guard isTrusted else {
             throw AccessibilityServiceError.permissionRequired
         }
 
         let focusedElement = try getFocusedElement()
-
-        var value: CFTypeRef?
-        let valueError = AXUIElementCopyAttributeValue(
-            focusedElement,
-            kAXValueAttribute as CFString,
-            &value
-        )
-
-        guard valueError == .success else {
-            throw AccessibilityServiceError.valueUnavailable(valueError)
-        }
-
-        guard let text = value as? String else {
-            throw AccessibilityServiceError.unsupportedTextValue
-        }
-
-        guard text.hasSuffix(trigger) else {
-            return .triggerNotAtEnd
-        }
+        let text = try readValue(of: focusedElement)
 
         var settable = DarwinBoolean(false)
         let settableError = AXUIElementIsAttributeSettable(
@@ -83,8 +68,36 @@ final class AccessibilityService {
             throw AccessibilityServiceError.valueNotSettable
         }
 
+        return FocusedTextField(element: focusedElement, value: text)
+    }
+
+    /// Replaces the captured field only if it is still focused and still
+    /// contains exactly `expectedValue`. Otherwise the field is left untouched.
+    func replaceText(
+        in field: FocusedTextField,
+        expectedValue: String,
+        with replacement: String
+    ) throws -> ReplacementDecision {
+        guard isTrusted else {
+            throw AccessibilityServiceError.permissionRequired
+        }
+
+        let currentFocus = try? getFocusedElement()
+        let isSameFocusedElement = currentFocus.map { CFEqual($0, field.element) } ?? false
+        let currentValue = isSameFocusedElement ? try? readValue(of: field.element) : nil
+
+        let decision = ReplacementDecision(
+            originalValue: expectedValue,
+            isSameFocusedElement: isSameFocusedElement,
+            currentValue: currentValue
+        )
+
+        guard decision == .replace else {
+            return decision
+        }
+
         let writeError = AXUIElementSetAttributeValue(
-            focusedElement,
+            field.element,
             kAXValueAttribute as CFString,
             replacement as CFString
         )
@@ -93,7 +106,26 @@ final class AccessibilityService {
             throw AccessibilityServiceError.writeFailed(writeError)
         }
 
-        return .replaced
+        return .replace
+    }
+
+    private func readValue(of element: AXUIElement) throws -> String {
+        var value: CFTypeRef?
+        let valueError = AXUIElementCopyAttributeValue(
+            element,
+            kAXValueAttribute as CFString,
+            &value
+        )
+
+        guard valueError == .success else {
+            throw AccessibilityServiceError.valueUnavailable(valueError)
+        }
+
+        guard let text = value as? String else {
+            throw AccessibilityServiceError.unsupportedTextValue
+        }
+
+        return text
     }
 
     private func getFocusedElement() throws -> AXUIElement {

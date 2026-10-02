@@ -1,7 +1,10 @@
-.PHONY: build app run clean
+.PHONY: build test app run clean
 
 build:
 	swift build
+
+test:
+	swift test
 
 app:
 	bash scripts/build-app.sh

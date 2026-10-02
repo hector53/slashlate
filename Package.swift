@@ -14,6 +14,11 @@ let package = Package(
         .executableTarget(
             name: "Slashlate",
             path: "Sources/Slashlate"
+        ),
+        .testTarget(
+            name: "SlashlateTests",
+            dependencies: ["Slashlate"],
+            path: "Tests/SlashlateTests"
         )
     ]
 )
