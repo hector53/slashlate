@@ -11,7 +11,7 @@ manuales en [`M1_TEST_PLAN.md`](M1_TEST_PLAN.md).
   en Mac real.**
 - `swift build`, `make test` (23 tests) y `make app` funcionan sin warnings.
 - Pendiente: completar `M1_TEST_PLAN.md` (browser, ChatGPT, fallos de red,
-  cambio de campo/app) y firmar con un certificado propio.
+  cambio de campo/app).
 
 ## Flujo de traducción
 
@@ -155,10 +155,16 @@ y volver a concederlo.
 
 ### Estado actual
 
-Temporalmente se firma con un certificado "Apple Development" existente en el
-llavero que **no** es de la cuenta del autor. Funciona para desarrollo local.
+Se firma con un certificado "Apple Development" propio, creado desde Xcode
+con una cuenta gratuita. `SLASHLATE_SIGN_IDENTITY` está definido en
+`~/.zshrc`, por lo que todos los rebuilds conservan Accessibility y el acceso
+al Keychain.
 
-### Pendiente: certificado propio
+### Cómo se creó el certificado (para repetirlo en otro Mac)
+
+No hace falta exportar el certificado: al crearlo en Xcode queda instalado en
+el llavero. Exportarlo a `.p12` solo sirve como backup o para otro Mac, y
+nunca debe ir al repositorio.
 
 1. Xcode → Settings → Accounts → **+** → Apple ID (cuenta gratuita sirve).
 2. Manage Certificates → **+** → **Apple Development**.
