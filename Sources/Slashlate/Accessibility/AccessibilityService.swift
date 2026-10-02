@@ -1,3 +1,4 @@
+import AppKit
 import ApplicationServices
 
 /// The focused text element and its value at the moment the trigger fired.
@@ -175,20 +176,78 @@ final class AccessibilityService {
         return text
     }
 
+    /// Returns the focused element. Native apps answer the system-wide query.
+    /// Electron apps (Slack, Discord, ...) do not build their accessibility
+    /// tree until asked through `AXManualAccessibility`, so the system-wide
+    /// query fails with `kAXErrorNoValue`; in that case the frontmost app is
+    /// asked to expose it and queried directly.
     private func getFocusedElement() throws -> AXUIElement {
-        let systemWideElement = AXUIElementCreateSystemWide()
+        let (focused, systemWideError) = copyFocusedElement(of: AXUIElementCreateSystemWide())
+        if let focused {
+            return focused
+        }
+
+        guard let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier
+        else {
+            throw AccessibilityServiceError.focusedElementUnavailable(systemWideError)
+        }
+
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+
+        // The tree is built asynchronously after the first enable, so retry
+        // briefly. Later lookups for the same app need no wait.
+        let attempts = enableManualAccessibility(on: appElement, pid: app.processIdentifier) ? 6 : 1
+        for attempt in 1...attempts {
+            if let focused = copyFocusedElement(of: appElement).element {
+                return focused
+            }
+            if attempt < attempts {
+                Thread.sleep(forTimeInterval: 0.03)
+            }
+        }
+
+        throw AccessibilityServiceError.focusedElementUnavailable(systemWideError)
+    }
+
+    private func copyFocusedElement(of element: AXUIElement) -> (element: AXUIElement?, error: AXError) {
         var focusedValue: CFTypeRef?
 
         let focusedError = AXUIElementCopyAttributeValue(
-            systemWideElement,
+            element,
             kAXFocusedUIElementAttribute as CFString,
             &focusedValue
         )
 
         guard focusedError == .success, let focusedValue else {
-            throw AccessibilityServiceError.focusedElementUnavailable(focusedError)
+            return (nil, focusedError)
         }
 
-        return focusedValue as! AXUIElement
+        return ((focusedValue as! AXUIElement), .success)
+    }
+
+    /// Process IDs that already accepted `AXManualAccessibility`.
+    private var manualAccessibilityPIDs: Set<pid_t> = []
+
+    /// Asks an Electron app to expose its accessibility tree. Returns true
+    /// only the first time it is enabled for that process. Non-Electron apps
+    /// reject the attribute and are left alone.
+    private func enableManualAccessibility(on appElement: AXUIElement, pid: pid_t) -> Bool {
+        guard !manualAccessibilityPIDs.contains(pid) else {
+            return false
+        }
+
+        let error = AXUIElementSetAttributeValue(
+            appElement,
+            "AXManualAccessibility" as CFString,
+            kCFBooleanTrue
+        )
+
+        guard error == .success else {
+            return false
+        }
+
+        manualAccessibilityPIDs.insert(pid)
+        return true
     }
 }

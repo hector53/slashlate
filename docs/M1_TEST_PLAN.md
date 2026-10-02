@@ -61,7 +61,7 @@ working exactly as before (re-run cases 1, 6 and 10).
 | 26 | Edit another line while waiting | Type `//.` on line 2, immediately edit line 1 | Translation discarded, edits kept | tested, hice dos lineas , en la segunda puse "//." y me fui arriba a la primera linea y no hice nada y funciono, pero volvi a hacer la prueba y cuando subi escribi rapido y ahi sino hizo la traduccion. |
 | 27 | Switch field / app while waiting | `//.` then click another field or Cmd-Tab | Nothing replaced anywhere | tested, si doy clic a otra app o lo que sea que me mueva el focus no traduce. |
 | 28 | Browser textarea | Cases 20-21 in Safari / Chrome | Same as TextEdit, or safe failure | tested |
-| 29 | Electron / web editor without cursor | `//.` in Slack / ChatGPT | Translated, or status `This field does not report the cursor position...` with text untouched |  tested, en slack no funciona la traduccion de ningun tipo, como que no reconoce los "///", en la pagina web de chatgpt si funciona, pero no probe en la app de mac de chatgpt. |
+| 29 | Electron / web editor without cursor | `//.` in Slack / ChatGPT | Translated, or status `This field does not report the cursor position...` with text untouched | **Re-tested after Electron fix: works in Slack.** Original note: en slack no funciona la traduccion de ningun tipo, como que no reconoce los "///", en la pagina web de chatgpt si funciona, pero no probe en la app de mac de chatgpt. |
 | 30 | API failure | Wi-Fi off, `hola //.` | `hola //.` untouched, error in status |  tested, esta pruyeba es igual a una de las de arriba. |
 
 ## Findings from the first full pass (2026-10-02)
@@ -79,9 +79,9 @@ working exactly as before (re-run cases 1, 6 and 10).
   text field (AX -25212)`. -25212 is `kAXErrorNoValue`: the system-wide
   focused-element query returns nothing because Slack (Electron) does not
   build its accessibility tree by default. The keyboard trigger is detected
-  and the failure is safe (text untouched). Candidate fix for a later
-  iteration: set `AXManualAccessibility = true` on the frontmost app's
-  `AXUIElement` before reading. ChatGPT web works; ChatGPT macOS app not
+  and the failure is safe (text untouched). **Fixed:** when the system-wide
+  query fails, Slashlate sets `AXManualAccessibility = true` on the frontmost
+  app's `AXUIElement` and reads its focused element. Validated in Slack. ChatGPT web works; ChatGPT macOS app not
   tested.
 - **Status feedback fix** (⚠️ icon + colored status) validated on a real Mac.
 

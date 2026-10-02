@@ -14,16 +14,18 @@ Entries are grouped by milestone; there are no tagged releases yet.
 - Popover status line shows an icon and color by kind: green (translated),
   orange (discarded / nothing to translate), red (API, network or
   Accessibility error).
+- Electron apps (Slack, Discord, ...): when the system-wide focused-element
+  query fails, Slashlate sets `AXManualAccessibility` on the frontmost app
+  and reads its focused element directly. Native apps are unaffected.
+  Validated in Slack on a real Mac (manual test 29).
 
 ### Fixed
+- Slack: no trigger worked (`AX -25212`, `kAXErrorNoValue`) because Electron
+  did not expose a focused element. Fixed by the fallback above.
 - Errors and discarded translations were effectively invisible: the status
   was small gray text only inside the popover (manual tests 8, 9, 10, 15).
 
 ### Pending
-- Slack: no trigger works (manual test 29). Status: `Could not read the
-  focused text field (AX -25212)` = `kAXErrorNoValue`: Slack (Electron) does
-  not expose a focused element to Accessibility. Text is left untouched.
-  Candidate fix: set `AXManualAccessibility` on the app element.
 - ChatGPT macOS app not tested yet.
 
 ## [M1.1] - 2026-10-02 - Translation scopes
