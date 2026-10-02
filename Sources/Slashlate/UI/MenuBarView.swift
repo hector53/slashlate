@@ -51,10 +51,13 @@ struct MenuBarView: View {
                 .font(.caption)
                 .fontWeight(.semibold)
 
-            Text("Type some text followed by (appState.trigger). Slashlate should replace the entire focused field with TEST TRANSLATION.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(
+                "Type some text followed by " + appState.trigger +
+                ". Slashlate should replace the entire focused field with TEST TRANSLATION."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
 
             Divider()
 
