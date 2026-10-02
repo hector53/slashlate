@@ -75,7 +75,7 @@ final class AppState: ObservableObject {
 
         keyboardMonitor = monitor
         isMonitoring = true
-        statusMessage = "Ready - type (trigger) at the end of a text field"
+        statusMessage = "Ready - type " + trigger + " at the end of a text field"
     }
 
     private func stopKeyboardMonitor() {
