@@ -8,8 +8,18 @@ struct SlashlateApp: App {
         MenuBarExtra {
             MenuBarView(appState: appState)
         } label: {
-            Image(systemName: "character.cursor.ibeam")
+            Image(systemName: menuBarSymbol)
         }
         .menuBarExtraStyle(.window)
+    }
+
+    private var menuBarSymbol: String {
+        if appState.isTranslating {
+            return "ellipsis.circle"
+        }
+        if appState.hasUnseenAlert {
+            return "exclamationmark.triangle.fill"
+        }
+        return "character.cursor.ibeam"
     }
 }

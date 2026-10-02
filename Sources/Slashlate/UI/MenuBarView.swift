@@ -32,9 +32,9 @@ struct MenuBarView: View {
                     : "exclamationmark.triangle.fill"
             )
 
-            Text(appState.statusMessage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            Label(appState.statusMessage, systemImage: appState.statusKind.symbol)
+                .font(.callout)
+                .foregroundStyle(appState.statusKind.color)
                 .fixedSize(horizontal: false, vertical: true)
 
             if !appState.accessibilityGranted {
@@ -70,6 +70,14 @@ struct MenuBarView: View {
         }
         .padding(14)
         .frame(width: 320)
+        // The popover is this app's only window: opening or closing it means
+        // the current status has been seen.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { _ in
+            appState.markStatusSeen()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+            appState.markStatusSeen()
+        }
     }
 
     @ViewBuilder
@@ -108,6 +116,27 @@ struct MenuBarView: View {
         if appState.saveAPIKey(apiKeyDraft) {
             apiKeyDraft = ""
             isEditingAPIKey = false
+        }
+    }
+}
+
+private extension StatusKind {
+    var symbol: String {
+        switch self {
+        case .info: return "info.circle"
+        case .translating: return "ellipsis.circle"
+        case .success: return "checkmark.circle.fill"
+        case .warning: return "exclamationmark.circle.fill"
+        case .error: return "xmark.octagon.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .info, .translating: return .secondary
+        case .success: return .green
+        case .warning: return .orange
+        case .error: return .red
         }
     }
 }

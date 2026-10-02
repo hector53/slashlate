@@ -61,6 +61,10 @@ If the request fails, times out, or you changed the text / field / app in the
 meantime, your original text (including `///`) stays exactly as it was and
 the reason is shown in the menu-bar popover. The same applies to `//.`.
 
+The menu-bar icon shows `…` while translating and ⚠️ when the last attempt
+failed or was discarded; click it to see why (red = error, orange =
+discarded, green = translated).
+
 ## Requirements
 
 - macOS 14 or newer
@@ -238,6 +242,10 @@ scripts/
 - full settings window (M1 ships only a minimal API key field)
 - launch at login
 - lightweight settings
+
+## Changelog
+
+See [`CHANGELOG.md`](CHANGELOG.md).
 
 ## License
 

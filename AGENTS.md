@@ -84,6 +84,8 @@ telemetry.
 - Do not commit API keys or other secrets.
 - Keep product scope narrow; prefer one reliable workflow over many features.
 - M1 translation code must remain behind a small TranslationService boundary.
+- Every user-visible change, fix or milestone gets an entry in `CHANGELOG.md`
+  (under `[Unreleased]` until the milestone is closed).
 
 ## Commands
 

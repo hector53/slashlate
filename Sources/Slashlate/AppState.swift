@@ -1,6 +1,20 @@
 import AppKit
 import Foundation
 
+enum StatusKind: Equatable {
+    case info
+    case translating
+    case success
+    /// Nothing was written, by design (text changed, focus moved, nothing to translate).
+    case warning
+    /// Something failed (API, network, Accessibility).
+    case error
+
+    var isAlert: Bool {
+        self == .warning || self == .error
+    }
+}
+
 @MainActor
 final class AppState: ObservableObject {
     @Published var isEnabled = true
@@ -9,6 +23,10 @@ final class AppState: ObservableObject {
     @Published private(set) var isTranslating = false
     @Published private(set) var hasAPIKey = false
     @Published private(set) var statusMessage = "Starting Slashlate..."
+    @Published private(set) var statusKind = StatusKind.info
+    /// A warning or error the user has not seen yet. Drives the menu-bar icon
+    /// so failures are visible without opening the popover.
+    @Published private(set) var hasUnseenAlert = false
 
     let triggers = TranslationTrigger.all
 
@@ -42,18 +60,31 @@ final class AppState: ObservableObject {
         let apiKey = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !apiKey.isEmpty else {
-            statusMessage = "API key is empty"
+            setStatus("API key is empty", .warning)
             return false
         }
 
         do {
             try apiKeyStore.save(apiKey)
             hasAPIKey = true
-            statusMessage = "OpenRouter API key saved"
+            setStatus("OpenRouter API key saved", .success)
             return true
         } catch {
-            statusMessage = "Could not save the API key: " + error.localizedDescription
+            setStatus("Could not save the API key: " + error.localizedDescription, .error)
             return false
+        }
+    }
+
+    /// Called when the popover opens or closes: whatever it showed has been seen.
+    func markStatusSeen() {
+        hasUnseenAlert = false
+    }
+
+    private func setStatus(_ message: String, _ kind: StatusKind) {
+        statusMessage = message
+        statusKind = kind
+        if kind.isAlert {
+            hasUnseenAlert = true
         }
     }
 
@@ -95,7 +126,7 @@ final class AppState: ObservableObject {
             startKeyboardMonitorIfNeeded()
         } else {
             stopKeyboardMonitor()
-            statusMessage = "Accessibility permission required"
+            setStatus("Accessibility permission required", .error)
         }
     }
 
@@ -111,14 +142,17 @@ final class AppState: ObservableObject {
         }
 
         guard monitor.start() else {
-            statusMessage = "Could not start the global keyboard monitor"
+            setStatus("Could not start the global keyboard monitor", .error)
             return
         }
 
         keyboardMonitor = monitor
         isMonitoring = true
-        statusMessage = "Ready - type " + TranslationTrigger.wholeField.sequence
-            + " (whole field) or " + TranslationTrigger.currentLine.sequence + " (current line)"
+        setStatus(
+            "Ready - type " + TranslationTrigger.wholeField.sequence
+                + " (whole field) or " + TranslationTrigger.currentLine.sequence + " (current line)",
+            .info
+        )
     }
 
     private func stopKeyboardMonitor() {
@@ -133,7 +167,7 @@ final class AppState: ObservableObject {
         }
 
         guard activeTranslation == nil else {
-            statusMessage = "Translating... (ignored new trigger)"
+            setStatus("Translating... (ignored new trigger)", .translating)
             return
         }
 
@@ -141,7 +175,7 @@ final class AppState: ObservableObject {
         do {
             field = try accessibilityService.captureFocusedTextField()
         } catch {
-            statusMessage = error.localizedDescription
+            setStatus(error.localizedDescription, .error)
             return
         }
 
@@ -153,14 +187,14 @@ final class AppState: ObservableObject {
                 selectedUTF16Range: field.selectedUTF16Range
             )
         } catch {
-            statusMessage = error.localizedDescription
+            setStatus(error.localizedDescription, .warning)
             return
         }
 
         // The visible text (including the trigger) is left untouched until a
         // valid translation arrives and the field is verified unchanged.
         isTranslating = true
-        statusMessage = "Translating..."
+        setStatus("Translating...", .translating)
 
         activeTranslation = Task { [weak self, translationService] in
             let result: Result<String, Error>
@@ -189,7 +223,7 @@ final class AppState: ObservableObject {
         case .success(let value):
             translation = value
         case .failure(let error):
-            statusMessage = error.localizedDescription
+            setStatus(error.localizedDescription, .error)
             return
         }
 
@@ -202,14 +236,14 @@ final class AppState: ObservableObject {
 
             switch decision {
             case .replace:
-                statusMessage = "Translated"
+                setStatus("Translated", .success)
             case .focusChanged:
-                statusMessage = "Translation discarded - focus moved to another field"
+                setStatus("Translation discarded - focus moved to another field", .warning)
             case .textChanged:
-                statusMessage = "Translation discarded - the text changed while translating"
+                setStatus("Translation discarded - the text changed while translating", .warning)
             }
         } catch {
-            statusMessage = error.localizedDescription
+            setStatus(error.localizedDescription, .error)
         }
     }
 }
