@@ -4,3 +4,4 @@ build/
 .swiftpm/
 .vscode/
 *.xcuserstate
+.signing-identity

@@ -13,7 +13,33 @@ The primary interaction for v0.1 is:
 4. Slashlate replaces the text in place;
 5. Slashlate never presses Enter or sends the message.
 
-## Current milestone: M1
+## Current milestone: M1.1 (translation scopes)
+
+M1 is validated on a real Mac. M1.1 adds a second trigger:
+
+- `///` -> `TranslationScope.wholeField` (M1 behavior, must not change);
+- `//.` -> `TranslationScope.currentLine`: translates only the line that
+  contains the cursor.
+
+M1.1 rules:
+
+- triggers and their scopes are defined once, in `TranslationTrigger`;
+  `TriggerDetector` returns which trigger fired;
+- scope-specific logic lives only in `TranslationTarget` (what to send to the
+  model, which range to replace, where to leave the cursor); the
+  capture -> parse target -> translate -> validate snapshot -> replace flow in
+  `AppState` is shared by every scope;
+- `//.` reads `kAXSelectedTextRangeAttribute`; the trigger must be
+  immediately before an empty selection. If the control does not expose the
+  cursor, fail safely and leave the text untouched (no clipboard fallback);
+- only the current line is replaced; text before and after it is written back
+  byte-for-byte;
+- snapshot validation is unchanged: same element, exact same full value.
+
+Not in M1.1: more triggers, configurable triggers or hotkeys, more
+languages, advanced settings, M2 work.
+
+## M1
 
 M0 (global `///` detection, Accessibility permission, reading and replacing
 the focused field inline, menu-bar app) is validated on a real Mac. Do not
@@ -35,7 +61,7 @@ M1 rules:
 - at most one translation in flight;
 - request timeout of about 10 seconds.
 
-Not in M1: multiple languages, other or configurable triggers, configurable
+Not in M1: multiple languages, other (beyond `//.` in M1.1) or configurable triggers, configurable
 hotkeys, model/provider selectors, streaming, history, analytics, accounts,
 auto update, launch at login, clipboard fallback, onboarding, main window,
 telemetry.
@@ -72,7 +98,7 @@ make clean
 ## Validation
 
 Start with TextEdit, then test browser text areas and Electron apps. Record
-M0 compatibility findings in `docs/M0_TEST_PLAN.md` and M1 results in
+M0 compatibility findings in `docs/M0_TEST_PLAN.md` and M1/M1.1 results in
 `docs/M1_TEST_PLAN.md`.
 
 A macOS integration change is not considered validated merely because it

@@ -67,7 +67,7 @@ Garantías:
 | `Sources/Slashlate/Translation/OpenRouterClient.swift` | `OpenRouterConfiguration` (modelo, endpoint, timeout: único lugar a cambiar) y `OpenRouterTranslationService` |
 | `Sources/Slashlate/Translation/OpenRouterModels.swift` | Solo el JSON necesario de request/response |
 | `Sources/Slashlate/Translation/TranslationPrompt.swift` | System prompt |
-| `Sources/Slashlate/Translation/TriggeredText.swift` | Lógica pura: quitar el trigger y decidir si se puede reemplazar (`ReplacementDecision`) |
+| `Sources/Slashlate/Translation/TriggeredText.swift` (en M1.1 → `TranslationTarget.swift`) | Lógica pura: quitar el trigger y decidir si se puede reemplazar (`ReplacementDecision`) |
 | `Sources/Slashlate/Security/KeychainService.swift` | API key en el login Keychain + caché en memoria (`CachedKeychainValue`) |
 | `Tests/SlashlateTests/OpenRouterClientTests.swift` | Parsing, errores HTTP/red, forma de la request |
 | `Tests/SlashlateTests/TriggeredTextTests.swift` | Eliminación del trigger y decisiones de reemplazo |
@@ -178,6 +178,16 @@ nunca debe ir al repositorio.
 
 Después de esto no debería volver a pedirse ningún permiso en los rebuilds.
 
+### Recaída en M1.1: build ad-hoc desde un shell sin `~/.zshrc`
+
+Un `make app` lanzado desde un shell que no carga `~/.zshrc` (en este caso el
+del agente) firmó ad-hoc sin avisar, y Accessibility volvió a aparecer como
+"required" aunque el toggle estaba activo. Solución: `build-app.sh` también
+lee la identidad de `.signing-identity` (en `.gitignore`) y avisa cuando firma
+ad-hoc. Se arregla con `make run`; no hace falta `tccutil reset`, porque el
+permiso existente corresponde a la firma con certificado.
+
+
 ## Tests
 
 `make test` - 23 tests, sin llamadas reales a OpenRouter:
@@ -204,3 +214,106 @@ Accessibility no tiene tests unitarios; se valida manualmente
 - La traducción reemplaza el contenido completo del campo, igual que M0.
 - Fuera de alcance en M1: múltiples idiomas, triggers configurables, selector
   de modelos, streaming, historial, ventana de settings.
+
+## M1.1 - Translation scopes
+
+**Estado:** `//.` validado en Mac real (2026-10-02). `///` sin regresiones.
+
+### Comportamiento
+
+| Trigger | `TranslationScope` | Traduce |
+| --- | --- | --- |
+| `///` | `.wholeField` | todo el campo (igual que M1) |
+| `//.` | `.currentLine` | solo la línea que contiene el cursor |
+
+```text
+linea 1
+hola mundo //.      ← cursor justo después de //.
+linea 3
+        ↓
+linea 1
+Hello world.
+linea 3
+```
+
+### Arquitectura
+
+```text
+KeyboardMonitor ─ TriggerDetector.ingest → TranslationTrigger (sequence + scope)
+        │
+        ▼
+AppState.handleTrigger(trigger)                     (un solo flujo para ambos)
+  1. capture   AccessibilityService.captureFocusedTextField()
+               → element, value, selectedUTF16Range (opcional)
+  2. target    TranslationTarget(trigger:fieldValue:selectedUTF16Range:)
+               → scope, originalValue, sourceText, replacementRange
+  3. translate TranslationService.translate(sourceText)
+  4. validate  mismo elemento + valor == originalValue   (sin cambios de M1)
+  5. replace   target.replacement(with:) → FieldReplacement(value, cursor)
+```
+
+- `TranslationTrigger` es el único lugar donde se definen los triggers y su
+  scope. `TriggerDetector` devuelve qué trigger se completó.
+- `TranslationTarget` (antes `TriggeredText`) es el único lugar con lógica
+  por scope. `AppState` y `AccessibilityService` no hacen `switch` sobre el
+  scope.
+- `.wholeField`: exactamente M1. `hasSuffix("///")` sobre el valor
+  completo, `replacementRange` = todo el valor, no se toca el cursor. No
+  depende de `AXSelectedTextRange`.
+- `.currentLine`:
+  - requiere `AXSelectedTextRange` con longitud 0 (cursor, no selección);
+    si no está disponible → `This field does not report the cursor
+    position - use /// instead` y el texto queda intacto;
+  - el offset UTF-16 de AX se convierte a `String.Index` validando límites y
+    que no parta un carácter (emoji, etc.);
+  - `//.` debe estar **inmediatamente antes** del cursor; en cualquier otra
+    posición no se activa;
+  - `scheme://.` (`:` justo antes) se ignora, para no activarse escribiendo
+    una URL;
+  - la línea va del salto de línea anterior al siguiente; se conserva la
+    indentación y se reemplaza desde el primer carácter visible hasta el fin
+    de línea; si hay texto después del cursor en la misma línea se incluye;
+  - `sourceText` = la línea sin `//.`, con trim;
+  - el valor final es `originalValue` con solo `replacementRange`
+    sustituido: el resto se conserva byte a byte (CRLF, emoji, tabs,
+    espacios finales);
+  - tras escribir, se intenta dejar el cursor al final de la línea traducida
+    (best effort; si el control lo rechaza no pasa nada).
+- Escritura: se sigue escribiendo el valor completo con `kAXValueAttribute`
+  (lo validado en M0/M1). No se usa clipboard.
+
+### Seguridad async
+
+Sin cambios respecto a M1: antes de escribir, el mismo `AXUIElement` debe
+seguir enfocado y su valor completo debe ser exactamente el snapshot. Si el
+usuario escribió/borró en **cualquier** línea, cambió de campo o de app, se
+descarta. Errores de OpenRouter nunca modifican el campo. Una sola
+traducción en curso. Nunca se pulsa Enter.
+
+### Archivos
+
+| Archivo | Cambio |
+| --- | --- |
+| `Translation/TranslationTrigger.swift` | Nuevo: `TranslationScope`, `TranslationTrigger` (`///`, `//.`) |
+| `Translation/TranslationTarget.swift` | `TriggeredText` → `TranslationTarget`, `TranslationTargetError`, `FieldReplacement` |
+| `Keyboard/TriggerDetector.swift` | Varios triggers; devuelve `TranslationTrigger?` |
+| `Keyboard/KeyboardMonitor.swift` | Pasa el trigger detectado al callback |
+| `Accessibility/AccessibilityService.swift` | Lee `AXSelectedTextRange` (opcional); `replaceText` recibe `FieldReplacement` y coloca el cursor si se pide |
+| `AppState.swift` | Usa `TranslationTarget`; mismo flujo para ambos scopes |
+| `UI/MenuBarView.swift` | Texto de ayuda con ambos triggers, etiqueta M1.1 |
+| `Tests/SlashlateTests/TranslationTargetTests.swift` | Tests de M1 portados + tests de `//.` |
+| `Tests/SlashlateTests/TriggerDetectorTests.swift` | Nuevo |
+
+### Tests
+
+`make test` - 48 tests (23 de M1 + 25 nuevos). Pruebas manuales en
+[`M1_TEST_PLAN.md`](M1_TEST_PLAN.md#m11---current-line).
+
+### Limitaciones conocidas
+
+- Controles que no exponen `AXSelectedTextRange` (algunos editores web /
+  Electron) no soportan `//.`; `///` sigue funcionando en ellos.
+- En editores que reportan offsets distintos a UTF-16 (raro), el trigger no
+  se encontraría en el cursor y se descarta (lado seguro).
+- Una "línea" es un párrafo separado por saltos de línea, no una línea
+  visual por ajuste de texto.

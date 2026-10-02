@@ -1,4 +1,4 @@
-# M1 test plan
+# M1 / M1.1 test plan
 
 M1 adds real Spanish -> English translation through OpenRouter. These checks
 must be done manually on a real Mac with Accessibility granted and an
@@ -44,6 +44,25 @@ makes it easier to reproduce.
 | 17 | Relaunch app | Still shows `Configured`, translation works | Not tested |
 | 18 | Rebuild (`make run`) | macOS may prompt for Keychain access - `Always Allow`; translation works | Not tested |
 | 19 | Replace key | `Replace API Key` -> save new key -> translation uses new key | Not tested |
+
+## M1.1 - current line
+
+`//.` translates only the line that contains the cursor. `///` must keep
+working exactly as before (re-run cases 1, 6 and 10).
+
+| # | Scenario | Steps | Expected | Result |
+| --- | --- | --- | --- | --- |
+| 20 | Last line (TextEdit) | `Esta línea debe permanecer en español.` ⏎ `esta linea debe traducirse //.` | Only line 2 becomes English; line 1 identical | Not tested |
+| 21 | Middle line | Type 3 lines, click at end of line 2, type ` //.` | Only line 2 translated; lines 1 and 3 identical; cursor at end of line 2 | Not tested |
+| 22 | Empty lines around | Blank lines above/below the target line | Blank lines preserved | Not tested |
+| 23 | Indented line | `    hola mundo //.` | Indentation kept, text translated | Not tested |
+| 24 | `///` regression | Two lines then `///` | Whole field translated as in M1 | Not tested |
+| 25 | URL | Type `mira https://example.com` | Nothing triggers | Not tested |
+| 26 | Edit another line while waiting | Type `//.` on line 2, immediately edit line 1 | Translation discarded, edits kept | Not tested |
+| 27 | Switch field / app while waiting | `//.` then click another field or Cmd-Tab | Nothing replaced anywhere | Not tested |
+| 28 | Browser textarea | Cases 20-21 in Safari / Chrome | Same as TextEdit, or safe failure | Not tested |
+| 29 | Electron / web editor without cursor | `//.` in Slack / ChatGPT | Translated, or status `This field does not report the cursor position...` with text untouched | Not tested |
+| 30 | API failure | Wi-Fi off, `hola //.` | `hola //.` untouched, error in status | Not tested |
 
 ## What to record on failure
 

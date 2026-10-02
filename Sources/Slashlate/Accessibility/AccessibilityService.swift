@@ -7,6 +7,9 @@ import ApplicationServices
 struct FocusedTextField {
     let element: AXUIElement
     let value: String
+    /// `AXSelectedTextRange` in UTF-16 units, or nil if the control does not
+    /// expose it.
+    let selectedUTF16Range: Range<Int>?
 }
 
 enum AccessibilityServiceError: LocalizedError {
@@ -68,15 +71,20 @@ final class AccessibilityService {
             throw AccessibilityServiceError.valueNotSettable
         }
 
-        return FocusedTextField(element: focusedElement, value: text)
+        return FocusedTextField(
+            element: focusedElement,
+            value: text,
+            selectedUTF16Range: readSelectedRange(of: focusedElement)
+        )
     }
 
-    /// Replaces the captured field only if it is still focused and still
-    /// contains exactly `expectedValue`. Otherwise the field is left untouched.
+    /// Writes `replacement` to the captured field only if it is still focused
+    /// and still contains exactly `expectedValue`. Otherwise the field is left
+    /// untouched.
     func replaceText(
         in field: FocusedTextField,
         expectedValue: String,
-        with replacement: String
+        with replacement: FieldReplacement
     ) throws -> ReplacementDecision {
         guard isTrusted else {
             throw AccessibilityServiceError.permissionRequired
@@ -99,14 +107,53 @@ final class AccessibilityService {
         let writeError = AXUIElementSetAttributeValue(
             field.element,
             kAXValueAttribute as CFString,
-            replacement as CFString
+            replacement.value as CFString
         )
 
         guard writeError == .success else {
             throw AccessibilityServiceError.writeFailed(writeError)
         }
 
+        if let cursorOffset = replacement.cursorUTF16Offset {
+            // Best effort: the text is already written, so a control that
+            // rejects this just keeps its own cursor position.
+            var range = CFRange(location: cursorOffset, length: 0)
+            if let rangeValue = AXValueCreate(.cfRange, &range) {
+                AXUIElementSetAttributeValue(
+                    field.element,
+                    kAXSelectedTextRangeAttribute as CFString,
+                    rangeValue
+                )
+            }
+        }
+
         return .replace
+    }
+
+    private func readSelectedRange(of element: AXUIElement) -> Range<Int>? {
+        var value: CFTypeRef?
+        let error = AXUIElementCopyAttributeValue(
+            element,
+            kAXSelectedTextRangeAttribute as CFString,
+            &value
+        )
+
+        guard error == .success,
+              let value,
+              CFGetTypeID(value) == AXValueGetTypeID()
+        else {
+            return nil
+        }
+
+        var range = CFRange()
+        guard AXValueGetValue(value as! AXValue, .cfRange, &range),
+              range.location >= 0,
+              range.length >= 0
+        else {
+            return nil
+        }
+
+        return range.location..<(range.location + range.length)
     }
 
     private func readValue(of element: AXUIElement) throws -> String {

@@ -14,7 +14,7 @@ struct MenuBarView: View {
 
                 Spacer()
 
-                Text("M1")
+                Text("M1.1")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -54,8 +54,9 @@ struct MenuBarView: View {
             Divider()
 
             Text(
-                "Type Spanish text followed by " + appState.trigger +
-                ". Slashlate replaces the focused field with an English translation. It never sends the message."
+                "Type Spanish text followed by " + TranslationTrigger.wholeField.sequence +
+                " to translate the whole field, or " + TranslationTrigger.currentLine.sequence +
+                " to translate only the current line. Slashlate never sends the message."
             )
             .font(.caption)
             .foregroundStyle(.secondary)

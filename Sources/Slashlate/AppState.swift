@@ -10,7 +10,7 @@ final class AppState: ObservableObject {
     @Published private(set) var hasAPIKey = false
     @Published private(set) var statusMessage = "Starting Slashlate..."
 
-    let trigger = "///"
+    let triggers = TranslationTrigger.all
 
     private let accessibilityService = AccessibilityService()
     private let apiKeyStore: CachedKeychainValue
@@ -104,9 +104,9 @@ final class AppState: ObservableObject {
             return
         }
 
-        let monitor = KeyboardMonitor(trigger: trigger) { [weak self] in
+        let monitor = KeyboardMonitor(triggers: triggers) { [weak self] trigger in
             MainActor.assumeIsolated {
-                self?.handleTrigger()
+                self?.handleTrigger(trigger)
             }
         }
 
@@ -117,7 +117,8 @@ final class AppState: ObservableObject {
 
         keyboardMonitor = monitor
         isMonitoring = true
-        statusMessage = "Ready - type " + trigger + " at the end of a text field"
+        statusMessage = "Ready - type " + TranslationTrigger.wholeField.sequence
+            + " (whole field) or " + TranslationTrigger.currentLine.sequence + " (current line)"
     }
 
     private func stopKeyboardMonitor() {
@@ -126,7 +127,7 @@ final class AppState: ObservableObject {
         isMonitoring = false
     }
 
-    private func handleTrigger() {
+    private func handleTrigger(_ trigger: TranslationTrigger) {
         guard isEnabled else {
             return
         }
@@ -144,13 +145,15 @@ final class AppState: ObservableObject {
             return
         }
 
-        guard let triggeredText = TriggeredText(fieldValue: field.value, trigger: trigger) else {
-            statusMessage = "Trigger detected, but the focused field changed"
-            return
-        }
-
-        guard triggeredText.hasTextToTranslate else {
-            statusMessage = "Nothing to translate"
+        let target: TranslationTarget
+        do {
+            target = try TranslationTarget(
+                trigger: trigger,
+                fieldValue: field.value,
+                selectedUTF16Range: field.selectedUTF16Range
+            )
+        } catch {
+            statusMessage = error.localizedDescription
             return
         }
 
@@ -162,19 +165,19 @@ final class AppState: ObservableObject {
         activeTranslation = Task { [weak self, translationService] in
             let result: Result<String, Error>
             do {
-                result = .success(try await translationService.translate(triggeredText.sourceText))
+                result = .success(try await translationService.translate(target.sourceText))
             } catch {
                 result = .failure(error)
             }
 
-            self?.finishTranslation(result, field: field, triggeredText: triggeredText)
+            self?.finishTranslation(result, field: field, target: target)
         }
     }
 
     private func finishTranslation(
         _ result: Result<String, Error>,
         field: FocusedTextField,
-        triggeredText: TriggeredText
+        target: TranslationTarget
     ) {
         defer {
             activeTranslation = nil
@@ -193,8 +196,8 @@ final class AppState: ObservableObject {
         do {
             let decision = try accessibilityService.replaceText(
                 in: field,
-                expectedValue: triggeredText.originalValue,
-                with: translation
+                expectedValue: target.originalValue,
+                with: target.replacement(with: translation)
             )
 
             switch decision {

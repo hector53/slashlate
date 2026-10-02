@@ -9,7 +9,8 @@ making you leave the app you are using.
 
 ## Status
 
-**M1 - real Spanish -> English translation via OpenRouter**
+**M1.1 - translation scopes** (on top of M1: real Spanish -> English
+translation via OpenRouter)
 
 M0 (global `///` detection, Accessibility permission, reading and replacing
 the focused field inline) has been validated on a real Mac.
@@ -22,22 +23,43 @@ ya terminé el cambio ///
 I've finished the change.
 ```
 
+M1.1 adds a second trigger that translates only the current line:
+
+| Trigger | Scope | Translates |
+| --- | --- | --- |
+| `///` | whole field | everything in the field (M1 behavior, unchanged) |
+| `//.` | current line | only the line that contains the cursor |
+
+```text
+Esta línea debe permanecer en español.
+esta linea debe traducirse //.
+↓
+Esta línea debe permanecer en español.
+This line should be translated.
+```
+
+`//.` needs the field to report its cursor position through Accessibility
+(`AXSelectedTextRange`). If a control does not, Slashlate leaves the text
+untouched and says so in the menu-bar status - use `///` there.
+
 The model is called through the [OpenRouter](https://openrouter.ai) HTTP API
 (`openai/gpt-5-nano` by default, defined once in
 `Sources/Slashlate/Translation/OpenRouterClient.swift`).
 
 How a translation is applied safely:
 
-1. when `///` is typed, Slashlate captures the focused element and its value;
+1. when `///` or `//.` is typed, Slashlate captures the focused element, its
+   value and (for `//.`) the cursor position;
 2. the trigger is stripped only from the text sent to the model - the
    visible field is not touched while waiting;
 3. when the translation arrives, Slashlate re-checks **the same element**:
    it must still be focused and still contain exactly the original text;
-4. only then is the field replaced.
+4. only then is the field written: the whole value for `///`, or only the
+   current line for `//.` (everything before and after it is kept exactly).
 
 If the request fails, times out, or you changed the text / field / app in the
 meantime, your original text (including `///`) stays exactly as it was and
-the reason is shown in the menu-bar popover.
+the reason is shown in the menu-bar popover. The same applies to `//.`.
 
 ## Requirements
 
@@ -94,6 +116,18 @@ export SLASHLATE_SIGN_IDENTITY="Apple Development: you@example.com (TEAMID)"
 make run
 ```
 
+Shells that do not load `~/.zshrc` (IDE terminals, tools, scripts) will not
+see that variable and silently fall back to ad-hoc. To avoid that, also put
+the identity in an untracked file at the repo root (it is in `.gitignore`):
+
+```bash
+echo "<identity hash>" > .signing-identity
+```
+
+`make app` prints a warning whenever it falls back to an ad-hoc signature.
+Check the current build with `codesign -dvv build/Slashlate.app` (it must
+show `Authority=Apple Development: ...`, not `Signature=adhoc`).
+
 If permission already looks granted but Slashlate says it is required, reset
 the stale entry and grant it again:
 
@@ -115,9 +149,26 @@ After roughly a second the field becomes something like:
 Hello world.
 ```
 
+And for a single line, with the cursor at the end of the middle line:
+
+```text
+linea 1
+hola mundo //.
+linea 3
+```
+
+becomes:
+
+```text
+linea 1
+Hello world.
+linea 3
+```
+
 Slashlate must **never** submit or send the text automatically.
 
-Manual test cases live in [`docs/M1_TEST_PLAN.md`](docs/M1_TEST_PLAN.md);
+Manual test cases live in [`docs/M1_TEST_PLAN.md`](docs/M1_TEST_PLAN.md)
+(including the M1.1 `//.` cases);
 M0 compatibility notes are in [`docs/M0_TEST_PLAN.md`](docs/M0_TEST_PLAN.md).
 
 ## Project structure
@@ -128,7 +179,7 @@ Sources/Slashlate/
 │   └── AccessibilityService.swift
 ├── Keyboard/
 │   ├── KeyboardMonitor.swift
-│   └── TriggerDetector.swift
+│   └── TriggerDetector.swift      # which trigger was typed
 ├── Security/
 │   └── KeychainService.swift
 ├── Translation/
@@ -136,7 +187,8 @@ Sources/Slashlate/
 │   ├── OpenRouterClient.swift     # OpenRouter implementation + config
 │   ├── OpenRouterModels.swift
 │   ├── TranslationPrompt.swift
-│   └── TriggeredText.swift        # trigger stripping + replace safety check
+│   ├── TranslationTrigger.swift   # triggers and their TranslationScope
+│   └── TranslationTarget.swift    # what to translate/replace + safety check
 ├── UI/
 │   └── MenuBarView.swift
 ├── AppState.swift
@@ -155,7 +207,8 @@ scripts/
 ## Design principles
 
 - Never send a message automatically.
-- Never replace text unless the focused field still contains the trigger.
+- Never replace text unless the focused field still contains exactly the
+  text it had when the trigger was typed.
 - Never commit user secrets.
 - Keep the core interaction fast and invisible.
 - Prefer a small native macOS implementation over a large cross-platform stack.
@@ -168,12 +221,16 @@ scripts/
 - focused-field read/write
 - real-app compatibility testing
 
-### M1 - translation (current)
+### M1 - translation
 - Spanish -> English
 - OpenRouter
 - fast, inexpensive model
 - natural professional tone
 - safe failure behavior that preserves the original text
+
+### M1.1 - translation scopes (current)
+- `///` translates the whole field
+- `//.` translates only the current line
 
 ### M2 - product shell
 - configurable trigger

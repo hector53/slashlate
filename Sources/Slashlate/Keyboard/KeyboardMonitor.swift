@@ -3,10 +3,10 @@ import AppKit
 final class KeyboardMonitor {
     private var eventMonitor: Any?
     private var triggerDetector: TriggerDetector
-    private let onTrigger: () -> Void
+    private let onTrigger: (TranslationTrigger) -> Void
 
-    init(trigger: String, onTrigger: @escaping () -> Void) {
-        self.triggerDetector = TriggerDetector(trigger: trigger)
+    init(triggers: [TranslationTrigger], onTrigger: @escaping (TranslationTrigger) -> Void) {
+        self.triggerDetector = TriggerDetector(triggers: triggers)
         self.onTrigger = onTrigger
     }
 
@@ -29,15 +29,15 @@ final class KeyboardMonitor {
                 return
             }
 
-            guard self.triggerDetector.ingest(characters) else {
+            guard let trigger = self.triggerDetector.ingest(characters) else {
                 return
             }
 
             // The global monitor observes the key event before some target apps have
-            // committed the final "/" to their accessibility value. A tiny delay lets
-            // the target field finish processing the third slash before we inspect it.
+            // committed the trigger's last character to their accessibility value. A
+            // tiny delay lets the target field finish processing it before we inspect it.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                self?.onTrigger()
+                self?.onTrigger(trigger)
             }
         }
 

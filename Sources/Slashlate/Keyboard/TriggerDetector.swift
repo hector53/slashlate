@@ -1,30 +1,34 @@
 struct TriggerDetector {
-    let trigger: String
+    let triggers: [TranslationTrigger]
 
+    private let maxLength: Int
     private var buffer = ""
 
-    init(trigger: String) {
-        precondition(!trigger.isEmpty, "Trigger must not be empty")
-        self.trigger = trigger
+    init(triggers: [TranslationTrigger] = TranslationTrigger.all) {
+        precondition(!triggers.isEmpty, "At least one trigger is required")
+        precondition(triggers.allSatisfy { !$0.sequence.isEmpty }, "Triggers must not be empty")
+        self.triggers = triggers
+        maxLength = triggers.map(\.sequence.count).max() ?? 0
     }
 
-    mutating func ingest(_ characters: String) -> Bool {
+    /// Feeds typed characters and returns the trigger they complete, if any.
+    mutating func ingest(_ characters: String) -> TranslationTrigger? {
         guard !characters.isEmpty else {
-            return false
+            return nil
         }
 
         buffer.append(contentsOf: characters)
 
-        if buffer.count > trigger.count {
-            buffer = String(buffer.suffix(trigger.count))
+        if buffer.count > maxLength {
+            buffer = String(buffer.suffix(maxLength))
         }
 
-        guard buffer == trigger else {
-            return false
+        guard let trigger = triggers.first(where: { buffer.hasSuffix($0.sequence) }) else {
+            return nil
         }
 
         buffer.removeAll(keepingCapacity: true)
-        return true
+        return trigger
     }
 
     mutating func reset() {
