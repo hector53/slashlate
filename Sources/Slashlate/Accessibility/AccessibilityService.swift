@@ -18,15 +18,15 @@ enum AccessibilityServiceError: LocalizedError {
         case .permissionRequired:
             return "Slashlate needs Accessibility permission"
         case .focusedElementUnavailable(let error):
-            return "Could not read the focused text field (AX (error.rawValue))"
+            return "Could not read the focused text field (AX " + String(error.rawValue) + ")"
         case .valueUnavailable(let error):
-            return "Could not read text from the focused field (AX (error.rawValue))"
+            return "Could not read text from the focused field (AX " + String(error.rawValue) + ")"
         case .unsupportedTextValue:
             return "The focused control does not expose a plain text value"
         case .valueNotSettable:
             return "The focused text field is not writable through Accessibility"
         case .writeFailed(let error):
-            return "Could not replace the focused text (AX (error.rawValue))"
+            return "Could not replace the focused text (AX " + String(error.rawValue) + ")"
         }
     }
 }
