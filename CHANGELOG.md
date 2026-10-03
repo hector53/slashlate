@@ -5,7 +5,9 @@ All notable changes to Slashlate are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Entries are grouped by milestone; there are no tagged releases yet.
 
-## [Unreleased] - M2: hotkey and settings
+## [Unreleased]
+
+## [M2] - 2026-10-03 - Hotkey and settings (v0.2.0)
 
 ### Added
 - Settings window (`Settings…` in the popover) with three tabs:
@@ -16,6 +18,8 @@ Entries are grouped by milestone; there are no tagged releases yet.
     hijack app shortcuts like ⌘C. If the new shortcut cannot be registered,
     the previous one is restored. The hotkey is paused while recording.
   - **OpenRouter:** API key (moved from the popover; still Keychain only).
+- `make install`: builds and copies the app to `/Applications` (override
+  with `INSTALL_DIR`), so launch at login does not depend on `build/`.
 - Global hotkey `⌃⌥T` (fixed, defined once in `TranslationHotkey`):
   translates the selected text, or the whole field if nothing is selected.
   Registered with Carbon `RegisterEventHotKey`; the key press is consumed
@@ -38,6 +42,8 @@ Entries are grouped by milestone; there are no tagged releases yet.
 - `Settings…` closes the popover and opens the Settings window centered and
   in front (it used to open behind the popover, partly hidden).
 - Help text shows the current hotkey.
+- App version is `0.2.0` (`CFBundleShortVersionString`); the popover shows
+  it instead of a hard-coded milestone label.
 
 ### Fixed
 - ChatGPT macOS app (`com.openai.codex`): rejected `AXManualAccessibility`

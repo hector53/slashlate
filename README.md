@@ -87,6 +87,13 @@ make run
 This builds a release binary, assembles `build/Slashlate.app`, applies an
 ad-hoc signature, and launches it.
 
+To install it in `/Applications` (recommended if you enable "Open at
+login"):
+
+```bash
+make install
+```
+
 Run the unit tests with:
 
 ```bash
@@ -115,8 +122,9 @@ change it.
 **Settings…** in the menu-bar popover opens:
 
 - **General** - open Slashlate at login. macOS registers the app at its
-  current path (`build/Slashlate.app` when using `make run`); if you move or
-  delete it, turn the option off and on again.
+  current path, so enable it from the copy installed with `make install`
+  (not from `build/`). If you move or delete the app, turn the option off
+  and on again.
 - **Hotkey** - click the shortcut and press a new one (must include ⌃ or ⌥;
   Esc cancels), or reset to `⌃⌥T`.
 - **OpenRouter** - API key (stored only in the Keychain).
@@ -263,7 +271,7 @@ scripts/
 - menu-bar icon and colored status for errors / discarded translations
 - Slack and other Electron apps via `AXManualAccessibility`
 
-### M2 - product shell (in progress)
+### M2 - product shell (v0.2.0)
 - global hotkey `⌃⌥T` (selection or whole field) - done
 - configurable hotkey - done
 - settings window - done

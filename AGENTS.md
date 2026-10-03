@@ -13,9 +13,9 @@ The primary interaction for v0.1 is:
 4. Slashlate replaces the text in place;
 5. Slashlate never presses Enter or sends the message.
 
-## Current milestone: M2 (hotkey)
+## Current milestone: M2 (hotkey) - closed as v0.2.0
 
-M1.2 is closed (tag `v0.1.2`). M2 starts with one fixed global hotkey:
+M1.2 is closed (tag `v0.1.2`). M2 adds a global hotkey and a Settings window:
 
 - `⌃⌥T`, defined once in `TranslationHotkey` (`Keyboard/HotkeyMonitor.swift`),
   registered with Carbon `RegisterEventHotKey` (no extra permission);
@@ -111,6 +111,7 @@ swift build
 make test
 make app
 make run
+make install   # build + copy to /Applications
 make clean
 ```
 

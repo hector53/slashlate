@@ -13,7 +13,7 @@ struct MenuBarView: View {
 
                 Spacer()
 
-                Text("M2")
+                Text(appVersion)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -79,6 +79,12 @@ struct MenuBarView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
             appState.markStatusSeen()
         }
+    }
+
+    /// From Info.plist, so the popover never shows a stale milestone label.
+    private var appVersion: String {
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
+            .map { "v" + $0 } ?? "dev"
     }
 
     private func showSettings() {

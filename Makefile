@@ -1,4 +1,4 @@
-.PHONY: build test app run clean
+.PHONY: build test app run install clean
 
 build:
 	swift build
@@ -11,6 +11,9 @@ app:
 
 run:
 	bash scripts/run-app.sh
+
+install:
+	bash scripts/install-app.sh
 
 clean:
 	rm -rf .build build
