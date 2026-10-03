@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import OSLog
 
 /// The focused text element and its value at the moment the trigger fired.
 ///
@@ -40,6 +41,11 @@ enum AccessibilityServiceError: LocalizedError {
 }
 
 final class AccessibilityService {
+    /// Diagnostics for the Electron fallback. Logs only AX error codes and
+    /// bundle IDs, never field contents. View with:
+    /// `log stream --predicate 'subsystem == "dev.hectoracosta.slashlate"'`
+    private let logger = Logger(subsystem: "dev.hectoracosta.slashlate", category: "accessibility")
+
     var isTrusted: Bool {
         AXIsProcessTrusted()
     }
@@ -197,15 +203,27 @@ final class AccessibilityService {
 
         // The tree is built asynchronously after the first enable, so retry
         // briefly. Later lookups for the same app need no wait.
+        let bundleID = app.bundleIdentifier ?? "unknown"
         let attempts = enableManualAccessibility(on: appElement, pid: app.processIdentifier) ? 6 : 1
+        var lastError = AXError.success
         for attempt in 1...attempts {
-            if let focused = copyFocusedElement(of: appElement).element {
+            let (focused, error) = copyFocusedElement(of: appElement)
+            if let focused {
+                logger.info("\(bundleID, privacy: .public): focused element via app fallback (attempt \(attempt))")
                 return focused
             }
+            lastError = error
             if attempt < attempts {
                 Thread.sleep(forTimeInterval: 0.03)
             }
         }
+
+        let windowError = attributeError(kAXFocusedWindowAttribute, of: appElement)
+        let manualError = attributeError("AXManualAccessibility", of: appElement)
+        let enhancedError = attributeError("AXEnhancedUserInterface", of: appElement)
+        logger.error(
+            "\(bundleID, privacy: .public): no focused element. system-wide AX \(systemWideError.rawValue), app AX \(lastError.rawValue) after \(attempts) attempt(s), focused window AX \(windowError.rawValue), AXManualAccessibility read AX \(manualError.rawValue), AXEnhancedUserInterface read AX \(enhancedError.rawValue)"
+        )
 
         throw AccessibilityServiceError.focusedElementUnavailable(systemWideError)
     }
@@ -226,28 +244,36 @@ final class AccessibilityService {
         return ((focusedValue as! AXUIElement), .success)
     }
 
-    /// Process IDs that already accepted `AXManualAccessibility`.
-    private var manualAccessibilityPIDs: Set<pid_t> = []
+    private func attributeError(_ attribute: String, of element: AXUIElement) -> AXError {
+        var value: CFTypeRef?
+        return AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+    }
 
-    /// Asks an Electron app to expose its accessibility tree. Returns true
-    /// only the first time it is enabled for that process. Non-Electron apps
-    /// reject the attribute and are left alone.
+    /// Process IDs Slashlate already asked to expose their accessibility tree.
+    private var accessibilityRequestedPIDs: Set<pid_t> = []
+
+    /// Asks a Chromium/Electron app to expose its accessibility tree. Returns
+    /// true only the first time for that process, so the caller waits for the
+    /// tree to be built once.
+    ///
+    /// `AXManualAccessibility` is Electron's dedicated switch (Slack). Some
+    /// Electron builds reject it (the ChatGPT macOS app: AX -25205);
+    /// `AXEnhancedUserInterface`, the flag screen readers set, is tried too.
+    /// Chromium may build its tree even when that call reports an error
+    /// (ChatGPT: AX -25208), so the result is not trusted either way.
     private func enableManualAccessibility(on appElement: AXUIElement, pid: pid_t) -> Bool {
-        guard !manualAccessibilityPIDs.contains(pid) else {
+        guard accessibilityRequestedPIDs.insert(pid).inserted else {
             return false
         }
 
-        let error = AXUIElementSetAttributeValue(
-            appElement,
-            "AXManualAccessibility" as CFString,
-            kCFBooleanTrue
-        )
-
-        guard error == .success else {
-            return false
+        for attribute in ["AXManualAccessibility", "AXEnhancedUserInterface"] {
+            let error = AXUIElementSetAttributeValue(appElement, attribute as CFString, kCFBooleanTrue)
+            logger.info("pid \(pid): set \(attribute, privacy: .public) -> AX \(error.rawValue)")
+            if error == .success {
+                break
+            }
         }
 
-        manualAccessibilityPIDs.insert(pid)
         return true
     }
 }

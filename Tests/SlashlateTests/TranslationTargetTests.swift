@@ -5,7 +5,7 @@ final class TranslationTargetTests: XCTestCase {
     // MARK: - Helpers
 
     private func wholeField(_ value: String) throws -> TranslationTarget {
-        try TranslationTarget(trigger: .wholeField, fieldValue: value, selectedUTF16Range: nil)
+        try TranslationTarget(request: .typed(.wholeField), fieldValue: value, selectedUTF16Range: nil)
     }
 
     /// Builds a current-line target with the cursor right after the first
@@ -18,7 +18,7 @@ final class TranslationTargetTests: XCTestCase {
             cursor = value.utf16.count
         }
         return try TranslationTarget(
-            trigger: .currentLine,
+            request: .typed(.currentLine),
             fieldValue: value,
             selectedUTF16Range: cursor..<cursor
         )
@@ -73,7 +73,7 @@ final class TranslationTargetTests: XCTestCase {
     func testWholeFieldIgnoresCursorPosition() throws {
         // /// keeps working on controls without AXSelectedTextRange.
         let target = try TranslationTarget(
-            trigger: .wholeField,
+            request: .typed(.wholeField),
             fieldValue: "hola ///",
             selectedUTF16Range: 0..<4
         )
@@ -148,23 +148,23 @@ final class TranslationTargetTests: XCTestCase {
 
     func testCurrentLineRequiresCursorPosition() {
         assertError(.cursorUnavailable) {
-            try TranslationTarget(trigger: .currentLine, fieldValue: "hola //.", selectedUTF16Range: nil)
+            try TranslationTarget(request: .typed(.currentLine), fieldValue: "hola //.", selectedUTF16Range: nil)
         }
     }
 
     func testCurrentLineRejectsSelection() {
         assertError(.triggerNotFound) {
-            try TranslationTarget(trigger: .currentLine, fieldValue: "hola //.", selectedUTF16Range: 0..<8)
+            try TranslationTarget(request: .typed(.currentLine), fieldValue: "hola //.", selectedUTF16Range: 0..<8)
         }
     }
 
     func testCurrentLineRejectsOutOfBoundsOrSplitCursor() {
         assertError(.triggerNotFound) {
-            try TranslationTarget(trigger: .currentLine, fieldValue: "hola //.", selectedUTF16Range: 99..<99)
+            try TranslationTarget(request: .typed(.currentLine), fieldValue: "hola //.", selectedUTF16Range: 99..<99)
         }
         // Offset 1 is inside the surrogate pair of 👍.
         assertError(.triggerNotFound) {
-            try TranslationTarget(trigger: .currentLine, fieldValue: "👍//.", selectedUTF16Range: 1..<1)
+            try TranslationTarget(request: .typed(.currentLine), fieldValue: "👍//.", selectedUTF16Range: 1..<1)
         }
     }
 
@@ -190,6 +190,87 @@ final class TranslationTargetTests: XCTestCase {
             try currentLine("mira https://x.dev/docs //.").sourceText,
             "mira https://x.dev/docs"
         )
+    }
+
+    // MARK: - Hotkey (selection or whole field)
+
+    private func hotkey(_ value: String, selecting marker: String? = nil) throws -> TranslationTarget {
+        var selection: Range<Int>?
+        if let marker, let range = value.range(of: marker) {
+            let start = value[..<range.lowerBound].utf16.count
+            selection = start..<(start + marker.utf16.count)
+        }
+        return try TranslationTarget(request: .hotkey, fieldValue: value, selectedUTF16Range: selection)
+    }
+
+    func testHotkeyTranslatesOnlyTheSelection() throws {
+        let target = try hotkey("Hi team,\nya terminé el cambio\nThanks", selecting: "ya terminé el cambio")
+        XCTAssertEqual(target.scope, .selection)
+        XCTAssertEqual(target.sourceText, "ya terminé el cambio")
+        XCTAssertEqual(
+            target.replacement(with: "I finished the change"),
+            FieldReplacement(
+                value: "Hi team,\nI finished the change\nThanks",
+                cursorUTF16Offset: "Hi team,\nI finished the change".utf16.count
+            )
+        )
+    }
+
+    func testHotkeySelectionWithinALine() throws {
+        let target = try hotkey("Ok, mañana lo reviso, thanks", selecting: "mañana lo reviso")
+        XCTAssertEqual(target.replacement(with: "I'll review it tomorrow").value, "Ok, I'll review it tomorrow, thanks")
+    }
+
+    func testHotkeySelectionKeepsEdgeWhitespace() throws {
+        let target = try hotkey("a\n  hola mundo \nb", selecting: "\n  hola mundo \n")
+        XCTAssertEqual(target.sourceText, "hola mundo")
+        XCTAssertEqual(target.replacement(with: "hello world").value, "a\n  hello world \nb")
+    }
+
+    func testHotkeyWithoutSelectionTranslatesWholeField() throws {
+        let value = "linea 1\nlinea 2"
+        let target = try TranslationTarget(request: .hotkey, fieldValue: value, selectedUTF16Range: 3..<3)
+        XCTAssertEqual(target.scope, .wholeField)
+        XCTAssertEqual(target.sourceText, "linea 1\nlinea 2")
+        XCTAssertEqual(target.replacement(with: "Line 1\nLine 2").value, "Line 1\nLine 2")
+    }
+
+    func testHotkeyWithoutCursorInfoTranslatesWholeField() throws {
+        let target = try hotkey("hola mundo")
+        XCTAssertEqual(target.scope, .wholeField)
+        XCTAssertEqual(target.sourceText, "hola mundo")
+    }
+
+    func testHotkeyDoesNotStripTriggerLikeText() throws {
+        // Nothing was typed, so "///" or "//." is just text.
+        XCTAssertEqual(try hotkey("ver https://x.dev ///").sourceText, "ver https://x.dev ///")
+        XCTAssertEqual(try hotkey("Nota: //.").sourceText, "Nota: //.")
+    }
+
+    func testHotkeyEmptyFieldOrBlankSelectionHasNothingToTranslate() {
+        assertError(.nothingToTranslate) { try self.hotkey("  \n ") }
+        assertError(.nothingToTranslate) { try self.hotkey("a   b", selecting: "   ") }
+    }
+
+    func testHotkeyRejectsInvalidSelection() {
+        assertError(.selectionUnavailable) {
+            try TranslationTarget(request: .hotkey, fieldValue: "hola", selectedUTF16Range: 2..<99)
+        }
+        assertError(.selectionUnavailable) {
+            try TranslationTarget(request: .hotkey, fieldValue: "👍 hola", selectedUTF16Range: 1..<7)
+        }
+    }
+
+    func testHotkeySelectionDiscardedWhenTextChanges() throws {
+        let target = try hotkey("uno dos tres", selecting: "dos")
+        XCTAssertEqual(
+            ReplacementDecision(originalValue: target.originalValue, isSameFocusedElement: true, currentValue: "uno dos tres!"),
+            .textChanged
+        )
+    }
+
+    func testHotkeyIsDefinedOnce() {
+        XCTAssertEqual(TranslationHotkey.translate.displayName, "⌃⌥T")
     }
 
     // MARK: - Async safety (snapshot validation)

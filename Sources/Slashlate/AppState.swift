@@ -34,6 +34,8 @@ final class AppState: ObservableObject {
     private let apiKeyStore: CachedKeychainValue
     private let translationService: TranslationService
     private var keyboardMonitor: KeyboardMonitor?
+    private var hotkeyMonitor: HotkeyMonitor?
+    let hotkey = TranslationHotkey.translate
     private var permissionTimer: Timer?
 
     /// M1 policy: at most one translation in flight. A trigger that fires
@@ -137,7 +139,7 @@ final class AppState: ObservableObject {
 
         let monitor = KeyboardMonitor(triggers: triggers) { [weak self] trigger in
             MainActor.assumeIsolated {
-                self?.handleTrigger(trigger)
+                self?.handleRequest(.typed(trigger))
             }
         }
 
@@ -150,18 +152,42 @@ final class AppState: ObservableObject {
         isMonitoring = true
         setStatus(
             "Ready - type " + TranslationTrigger.wholeField.sequence
-                + " (whole field) or " + TranslationTrigger.currentLine.sequence + " (current line)",
+                + " (whole field) or " + TranslationTrigger.currentLine.sequence
+                + " (current line), or press " + hotkey.displayName,
             .info
         )
+
+        startHotkeyMonitor()
+    }
+
+    /// The hotkey is optional: if it cannot be registered, typed triggers
+    /// keep working.
+    private func startHotkeyMonitor() {
+        let monitor = HotkeyMonitor(hotkey: hotkey) { [weak self] in
+            MainActor.assumeIsolated {
+                self?.handleRequest(.hotkey)
+            }
+        }
+
+        do {
+            try monitor.start()
+            hotkeyMonitor = monitor
+        } catch HotkeyMonitor.StartError.alreadyInUse {
+            setStatus(hotkey.displayName + " is used by another app - typed triggers still work", .warning)
+        } catch {
+            setStatus("Could not register " + hotkey.displayName + " - typed triggers still work", .warning)
+        }
     }
 
     private func stopKeyboardMonitor() {
         keyboardMonitor?.stop()
         keyboardMonitor = nil
+        hotkeyMonitor?.stop()
+        hotkeyMonitor = nil
         isMonitoring = false
     }
 
-    private func handleTrigger(_ trigger: TranslationTrigger) {
+    private func handleRequest(_ request: TranslationRequest) {
         guard isEnabled else {
             return
         }
@@ -182,7 +208,7 @@ final class AppState: ObservableObject {
         let target: TranslationTarget
         do {
             target = try TranslationTarget(
-                trigger: trigger,
+                request: request,
                 fieldValue: field.value,
                 selectedUTF16Range: field.selectedUTF16Range
             )

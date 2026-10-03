@@ -5,7 +5,38 @@ All notable changes to Slashlate are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Entries are grouped by milestone; there are no tagged releases yet.
 
-## [Unreleased]
+## [Unreleased] - M2: hotkey
+
+### Added
+- Global hotkey `⌃⌥T` (fixed, defined once in `TranslationHotkey`):
+  translates the selected text, or the whole field if nothing is selected.
+  Registered with Carbon `RegisterEventHotKey`; the key press is consumed
+  and nothing is typed into the field.
+- `TranslationScope.selection` and `TranslationRequest` (`typed` / `hotkey`).
+  `TranslationTarget` still owns every scope decision; the hotkey reuses the
+  same capture -> target -> translate -> validate -> replace flow.
+- If `⌃⌥T` is taken by another app, a warning is shown and typed triggers
+  keep working.
+- Electron fallback also tries `AXEnhancedUserInterface` when an app rejects
+  `AXManualAccessibility`, and always waits briefly the first time for the
+  tree to be built (Chromium may enable it even when the call reports an
+  error).
+- Privacy-safe diagnostics via `os.Logger` (AX error codes and bundle IDs
+  only, never field text):
+  `/usr/bin/log stream --predicate 'subsystem == "dev.hectoracosta.slashlate"'`.
+
+### Fixed
+- ChatGPT macOS app (`com.openai.codex`): rejected `AXManualAccessibility`
+  (AX -25205) so no focused element was found (AX -25212). Now works with
+  the hotkey after the `AXEnhancedUserInterface` fallback.
+
+### Known limitations
+- GitHub Copilot chat in VS Code: `Nothing to translate` with the hotkey.
+  Monaco leaves its accessibility text area empty unless VS Code runs in
+  screen-reader mode (`editor.accessibilitySupport: on`, not adopted).
+- `AXEnhancedUserInterface` can make window animations or window managers
+  (Rectangle, Magnet) behave differently in the app it is set on, until that
+  app quits. Only set for apps that reject `AXManualAccessibility`.
 
 ## [M1.2] - 2026-10-02 - Visible status and Electron support
 

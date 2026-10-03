@@ -89,8 +89,8 @@ working exactly as before (re-run cases 1, 6 and 10).
 
 | App | Status | Result |
 | --- | --- | --- |
-| ChatGPT macOS app (Electron) | `Could not read the focused text field (AX -25212)` | Not supported yet. Likely the `/` command menu takes focus. Text untouched. ChatGPT web works. |
-| Copilot chat in VS Code (Monaco) | `Trigger detected, but the focused field changed` | Not supported. Monaco exposes only part of its text unless `editor.accessibilitySupport` is `on` (not tested). Codex chat in VS Code works. |
+| ChatGPT macOS app (Electron) | `Could not read the focused text field (AX -25212)` | Fixed in M2 via the `AXEnhancedUserInterface` fallback (see `M2_TEST_PLAN.md`). The `/` menu was not the cause. |
+| Copilot chat in VS Code (Monaco) | `Trigger detected, but the focused field changed` / hotkey: `Nothing to translate` | Not supported. Monaco's accessibility text area is empty unless VS Code runs in screen-reader mode. Codex chat in VS Code works. |
 | Terminals (Claude Code CLI) | - | Not supported: no editable Accessibility text field. |
 
 ## What to record on failure

@@ -13,7 +13,19 @@ The primary interaction for v0.1 is:
 4. Slashlate replaces the text in place;
 5. Slashlate never presses Enter or sends the message.
 
-## Current milestone: M1.1 (translation scopes)
+## Current milestone: M2 (hotkey)
+
+M1.2 is closed (tag `v0.1.2`). M2 starts with one fixed global hotkey:
+
+- `⌃⌥T`, defined once in `TranslationHotkey` (`Keyboard/HotkeyMonitor.swift`),
+  registered with Carbon `RegisterEventHotKey` (no extra permission);
+- with a selection it translates only the selection
+  (`TranslationScope.selection`), otherwise the whole field;
+- the scope decision lives in `TranslationTarget` (`TranslationRequest.hotkey`);
+  the async-safety rules of M1/M1.1 apply unchanged;
+- not yet: configurable hotkey, settings window, launch at login.
+
+## M1.1 (translation scopes)
 
 M1 is validated on a real Mac. M1.1 adds a second trigger:
 

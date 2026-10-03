@@ -40,6 +40,10 @@ Esta línea debe permanecer en español.
 This line should be translated.
 ```
 
+Or press **`⌃⌥T`** (Control-Option-T): Slashlate translates the selected
+text, or the whole field if nothing is selected. Nothing is typed, so it
+also works where `/` opens a command menu.
+
 `//.` needs the field to report its cursor position through Accessibility
 (`AXSelectedTextRange`). If a control does not, Slashlate leaves the text
 untouched and says so in the menu-bar status - use `///` there.
@@ -184,6 +188,7 @@ Sources/Slashlate/
 ├── Accessibility/
 │   └── AccessibilityService.swift
 ├── Keyboard/
+│   ├── HotkeyMonitor.swift        # global ⌃⌥T (TranslationHotkey)
 │   ├── KeyboardMonitor.swift
 │   └── TriggerDetector.swift      # which trigger was typed
 ├── Security/
@@ -242,7 +247,8 @@ scripts/
 - menu-bar icon and colored status for errors / discarded translations
 - Slack and other Electron apps via `AXManualAccessibility`
 
-### M2 - product shell
+### M2 - product shell (in progress)
+- global hotkey `⌃⌥T` (selection or whole field) - done, fixed shortcut
 - configurable trigger
 - configurable hotkey
 - full settings window (M1 ships only a minimal API key field)

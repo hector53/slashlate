@@ -14,7 +14,7 @@ struct MenuBarView: View {
 
                 Spacer()
 
-                Text("M1.2")
+                Text("M2")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -53,11 +53,7 @@ struct MenuBarView: View {
 
             Divider()
 
-            Text(
-                "Type Spanish text followed by " + TranslationTrigger.wholeField.sequence +
-                " to translate the whole field, or " + TranslationTrigger.currentLine.sequence +
-                " to translate only the current line. Slashlate never sends the message."
-            )
+            Text(helpText)
             .font(.caption)
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
@@ -110,6 +106,16 @@ struct MenuBarView: View {
                 }
             }
         }
+    }
+
+    private var helpText: String {
+        let wholeField = TranslationTrigger.wholeField.sequence
+        let currentLine = TranslationTrigger.currentLine.sequence
+        let hotkey = appState.hotkey.displayName
+        return "Type Spanish text followed by \(wholeField) to translate the whole field, "
+            + "or \(currentLine) to translate only the current line. "
+            + "Press \(hotkey) to translate the selection, or the whole field if nothing is selected. "
+            + "Slashlate never sends the message."
     }
 
     private func saveAPIKey() {

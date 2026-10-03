@@ -6,6 +6,8 @@ enum TranslationTargetError: LocalizedError, Equatable {
     /// The control does not report a usable cursor position.
     case cursorUnavailable
     case nothingToTranslate
+    /// The control reported a selection that does not fit its text.
+    case selectionUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -15,6 +17,8 @@ enum TranslationTargetError: LocalizedError, Equatable {
             return "This field does not report the cursor position - use /// instead"
         case .nothingToTranslate:
             return "Nothing to translate"
+        case .selectionUnavailable:
+            return "Could not read the selected text"
         }
     }
 }
@@ -40,38 +44,55 @@ struct TranslationTarget: Equatable {
 
     /// - Parameters:
     ///   - selectedUTF16Range: the field's `AXSelectedTextRange` in UTF-16
-    ///     units, or nil if the control does not expose it. Only used by
-    ///     `.currentLine`.
+    ///     units, or nil if the control does not expose it. Used by
+    ///     `.currentLine` (cursor) and by the hotkey (selection).
     init(
-        trigger: TranslationTrigger,
+        request: TranslationRequest,
         fieldValue: String,
         selectedUTF16Range: Range<Int>?
     ) throws {
-        switch trigger.scope {
+        // A hotkey types nothing, so there is no trigger to find or strip.
+        let triggerSequence: String
+        switch request {
+        case .typed(let trigger):
+            scope = trigger.scope
+            triggerSequence = trigger.sequence
+        case .hotkey:
+            let hasSelection = !(selectedUTF16Range?.isEmpty ?? true)
+            scope = hasSelection ? .selection : .wholeField
+            triggerSequence = ""
+        }
+
+        let target: (sourceText: String, replacementRange: Range<String.Index>)
+        switch scope {
         case .wholeField:
-            guard fieldValue.hasSuffix(trigger.sequence) else {
+            guard fieldValue.hasSuffix(triggerSequence) else {
                 throw TranslationTargetError.triggerNotFound
             }
 
-            sourceText = String(fieldValue.dropLast(trigger.sequence.count))
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            replacementRange = fieldValue.startIndex..<fieldValue.endIndex
+            target = (
+                String(fieldValue.dropLast(triggerSequence.count))
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                fieldValue.startIndex..<fieldValue.endIndex
+            )
 
         case .currentLine:
-            let line = try Self.currentLine(
+            target = try Self.currentLine(
                 in: fieldValue,
-                trigger: trigger.sequence,
+                trigger: triggerSequence,
                 selectedUTF16Range: selectedUTF16Range
             )
-            sourceText = line.sourceText
-            replacementRange = line.replacementRange
+
+        case .selection:
+            target = try Self.selection(in: fieldValue, selectedUTF16Range: selectedUTF16Range)
         }
 
-        guard !sourceText.isEmpty else {
+        guard !target.sourceText.isEmpty else {
             throw TranslationTargetError.nothingToTranslate
         }
 
-        scope = trigger.scope
+        sourceText = target.sourceText
+        replacementRange = target.replacementRange
         originalValue = fieldValue
     }
 
@@ -84,8 +105,8 @@ struct TranslationTarget: Equatable {
         case .wholeField:
             // Same as M1: write the value and let the app place the cursor.
             return FieldReplacement(value: value, cursorUTF16Offset: nil)
-        case .currentLine:
-            // Keep the cursor at the end of the translated line instead of
+        case .currentLine, .selection:
+            // Keep the cursor at the end of the translated text instead of
             // wherever the app puts it after a full value write.
             let prefix = originalValue[..<replacementRange.lowerBound]
             return FieldReplacement(
@@ -120,7 +141,8 @@ struct TranslationTarget: Equatable {
         let triggerStart = beforeCursor.dropLast(trigger.count).endIndex
 
         // "scheme://." is a URL being typed, not a trigger.
-        if triggerStart > value.startIndex, value[value.index(before: triggerStart)] == ":" {
+        if !trigger.isEmpty, triggerStart > value.startIndex,
+           value[value.index(before: triggerStart)] == ":" {
             throw TranslationTargetError.triggerNotFound
         }
 
@@ -136,6 +158,29 @@ struct TranslationTarget: Equatable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         return (sourceText, contentStart..<lineEnd)
+    }
+
+    private static func selection(
+        in value: String,
+        selectedUTF16Range: Range<Int>?
+    ) throws -> (sourceText: String, replacementRange: Range<String.Index>) {
+        guard let selection = selectedUTF16Range,
+              let start = stringIndex(atUTF16Offset: selection.lowerBound, in: value),
+              let end = stringIndex(atUTF16Offset: selection.upperBound, in: value)
+        else {
+            throw TranslationTargetError.selectionUnavailable
+        }
+
+        // Spaces and line breaks at the edges of the selection stay in place.
+        let selected = value[start..<end]
+        guard let contentStart = selected.firstIndex(where: { !$0.isWhitespace }),
+              let contentLast = selected.lastIndex(where: { !$0.isWhitespace })
+        else {
+            throw TranslationTargetError.nothingToTranslate
+        }
+
+        let range = contentStart..<value.index(after: contentLast)
+        return (String(value[range]), range)
     }
 
     /// Converts an AX UTF-16 offset into a `String.Index` on a character
