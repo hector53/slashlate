@@ -40,8 +40,8 @@ Esta línea debe permanecer en español.
 This line should be translated.
 ```
 
-Or press **`⌃⌥T`** (Control-Option-T): Slashlate translates the selected
-text, or the whole field if nothing is selected. Nothing is typed, so it
+Or press **`⌃⌥T`** (Control-Option-T, configurable in Settings): Slashlate
+translates the selected text, or the whole field if nothing is selected. Nothing is typed, so it
 also works where `/` opens a command menu.
 
 `//.` needs the field to report its cursor position through Accessibility
@@ -102,13 +102,24 @@ and enable Slashlate. The menu-bar popover shows whether permission is active.
 ## Configure the OpenRouter API key
 
 1. Create a key at <https://openrouter.ai/keys>.
-2. Click the Slashlate icon in the menu bar.
-3. Paste the key into **OpenRouter API Key** and click **Save API Key**.
+2. Click the Slashlate icon in the menu bar, then **Settings…**.
+3. In the **OpenRouter** tab, paste the key and click **Save API Key**.
 
 The key is stored in your login **macOS Keychain** (item
 "Slashlate OpenRouter API Key"). It is never written to `UserDefaults`, to
 disk in plain text, to logs, or to the repository. Use **Replace API Key** to
 change it.
+
+## Settings
+
+**Settings…** in the menu-bar popover opens:
+
+- **General** - open Slashlate at login. macOS registers the app at its
+  current path (`build/Slashlate.app` when using `make run`); if you move or
+  delete it, turn the option off and on again.
+- **Hotkey** - click the shortcut and press a new one (must include ⌃ or ⌥;
+  Esc cancels), or reset to `⌃⌥T`.
+- **OpenRouter** - API key (stored only in the Keychain).
 
 ### Keeping permissions across rebuilds
 
@@ -193,6 +204,9 @@ Sources/Slashlate/
 │   └── TriggerDetector.swift      # which trigger was typed
 ├── Security/
 │   └── KeychainService.swift
+├── Settings/
+│   ├── SettingsStore.swift        # hotkey in UserDefaults
+│   └── LaunchAtLogin.swift        # SMAppService
 ├── Translation/
 │   ├── TranslationService.swift   # provider boundary
 │   ├── OpenRouterClient.swift     # OpenRouter implementation + config
@@ -201,7 +215,9 @@ Sources/Slashlate/
 │   ├── TranslationTrigger.swift   # triggers and their TranslationScope
 │   └── TranslationTarget.swift    # what to translate/replace + safety check
 ├── UI/
-│   └── MenuBarView.swift
+│   ├── MenuBarView.swift          # popover
+│   ├── SettingsView.swift         # Settings window
+│   └── HotkeyRecorder.swift
 ├── AppState.swift
 └── SlashlateApp.swift
 
@@ -248,11 +264,11 @@ scripts/
 - Slack and other Electron apps via `AXManualAccessibility`
 
 ### M2 - product shell (in progress)
-- global hotkey `⌃⌥T` (selection or whole field) - done, fixed shortcut
-- configurable trigger
-- configurable hotkey
-- full settings window (M1 ships only a minimal API key field)
-- launch at login
+- global hotkey `⌃⌥T` (selection or whole field) - done
+- configurable hotkey - done
+- settings window - done
+- launch at login - done
+- configurable typed triggers - deferred (URL / code collisions)
 - lightweight settings
 
 ## Changelog

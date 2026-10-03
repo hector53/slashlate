@@ -35,7 +35,8 @@ final class AppState: ObservableObject {
     private let translationService: TranslationService
     private var keyboardMonitor: KeyboardMonitor?
     private var hotkeyMonitor: HotkeyMonitor?
-    let hotkey = TranslationHotkey.translate
+    private let settingsStore = SettingsStore()
+    @Published private(set) var hotkey: TranslationHotkey
     private var permissionTimer: Timer?
 
     /// M1 policy: at most one translation in flight. A trigger that fires
@@ -49,6 +50,7 @@ final class AppState: ObservableObject {
             try apiKeyStore.read()
         })
         hasAPIKey = apiKeyStore.hasValue
+        hotkey = settingsStore.hotkey
 
         DispatchQueue.main.async { [weak self] in
             MainActor.assumeIsolated {
@@ -163,6 +165,16 @@ final class AppState: ObservableObject {
     /// The hotkey is optional: if it cannot be registered, typed triggers
     /// keep working.
     private func startHotkeyMonitor() {
+        if let error = registerHotkey() {
+            setStatus(error, .warning)
+        }
+    }
+
+    /// Registers `hotkey`. Returns a user-facing error, or nil on success.
+    private func registerHotkey() -> String? {
+        hotkeyMonitor?.stop()
+        hotkeyMonitor = nil
+
         let monitor = HotkeyMonitor(hotkey: hotkey) { [weak self] in
             MainActor.assumeIsolated {
                 self?.handleRequest(.hotkey)
@@ -172,11 +184,51 @@ final class AppState: ObservableObject {
         do {
             try monitor.start()
             hotkeyMonitor = monitor
+            return nil
         } catch HotkeyMonitor.StartError.alreadyInUse {
-            setStatus(hotkey.displayName + " is used by another app - typed triggers still work", .warning)
+            return hotkey.displayName + " is used by another app - typed triggers still work"
         } catch {
-            setStatus("Could not register " + hotkey.displayName + " - typed triggers still work", .warning)
+            return "Could not register " + hotkey.displayName + " - typed triggers still work"
         }
+    }
+
+    /// Unregisters the hotkey while the settings recorder listens for a new
+    /// one, so pressing the current shortcut does not start a translation.
+    func beginHotkeyRecording() {
+        hotkeyMonitor?.stop()
+        hotkeyMonitor = nil
+    }
+
+    /// Ends recording. With a new shortcut, registers and saves it; if it
+    /// cannot be registered, the previous one is restored. Returns a
+    /// user-facing error, or nil on success.
+    @discardableResult
+    func endHotkeyRecording(with newHotkey: TranslationHotkey?) -> String? {
+        let previous = hotkey
+        if let newHotkey {
+            hotkey = newHotkey
+        }
+
+        // Without Accessibility nothing is registered yet; the saved shortcut
+        // is used once the monitors start.
+        guard isMonitoring else {
+            settingsStore.hotkey = hotkey
+            return nil
+        }
+
+        if let error = registerHotkey() {
+            if newHotkey != nil {
+                hotkey = previous
+                _ = registerHotkey()
+            }
+            return error
+        }
+
+        settingsStore.hotkey = hotkey
+        if newHotkey != nil {
+            setStatus("Hotkey set to " + hotkey.displayName, .success)
+        }
+        return nil
     }
 
     private func stopKeyboardMonitor() {

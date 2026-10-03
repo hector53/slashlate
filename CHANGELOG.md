@@ -5,9 +5,17 @@ All notable changes to Slashlate are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Entries are grouped by milestone; there are no tagged releases yet.
 
-## [Unreleased] - M2: hotkey
+## [Unreleased] - M2: hotkey and settings
 
 ### Added
+- Settings window (`Settings…` in the popover) with three tabs:
+  - **General:** open Slashlate at login (`SMAppService.mainApp`; the system
+    is the source of truth, including "requires approval").
+  - **Hotkey:** record a new translate shortcut (Esc cancels) or reset to
+    `⌃⌥T`. Saved in `UserDefaults`. Shortcuts must use ⌃ or ⌥ so they never
+    hijack app shortcuts like ⌘C. If the new shortcut cannot be registered,
+    the previous one is restored. The hotkey is paused while recording.
+  - **OpenRouter:** API key (moved from the popover; still Keychain only).
 - Global hotkey `⌃⌥T` (fixed, defined once in `TranslationHotkey`):
   translates the selected text, or the whole field if nothing is selected.
   Registered with Carbon `RegisterEventHotKey`; the key press is consumed
@@ -24,6 +32,12 @@ Entries are grouped by milestone; there are no tagged releases yet.
 - Privacy-safe diagnostics via `os.Logger` (AX error codes and bundle IDs
   only, never field text):
   `/usr/bin/log stream --predicate 'subsystem == "dev.hectoracosta.slashlate"'`.
+
+### Changed
+- Popover shows only whether the API key is configured, plus `Settings…`.
+- `Settings…` closes the popover and opens the Settings window centered and
+  in front (it used to open behind the popover, partly hidden).
+- Help text shows the current hotkey.
 
 ### Fixed
 - ChatGPT macOS app (`com.openai.codex`): rejected `AXManualAccessibility`

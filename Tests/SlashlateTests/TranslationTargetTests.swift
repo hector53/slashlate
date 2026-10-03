@@ -269,10 +269,6 @@ final class TranslationTargetTests: XCTestCase {
         )
     }
 
-    func testHotkeyIsDefinedOnce() {
-        XCTAssertEqual(TranslationHotkey.translate.displayName, "⌃⌥T")
-    }
-
     // MARK: - Async safety (snapshot validation)
 
     func testReplacesWhenFieldIsUnchanged() {

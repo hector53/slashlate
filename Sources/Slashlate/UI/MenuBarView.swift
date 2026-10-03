@@ -3,8 +3,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     @ObservedObject var appState: AppState
-    @State private var apiKeyDraft = ""
-    @State private var isEditingAPIKey = false
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -49,7 +48,13 @@ struct MenuBarView: View {
 
             Divider()
 
-            apiKeySection
+            Label(
+                appState.hasAPIKey ? "OpenRouter API key configured" : "OpenRouter API key missing",
+                systemImage: appState.hasAPIKey ? "checkmark.circle.fill" : "exclamationmark.circle.fill"
+            )
+            .foregroundStyle(appState.hasAPIKey ? Color.primary : Color.orange)
+
+            Button("Settings…", action: showSettings)
 
             Divider()
 
@@ -76,35 +81,25 @@ struct MenuBarView: View {
         }
     }
 
-    @ViewBuilder
-    private var apiKeySection: some View {
-        Text("OpenRouter API Key")
-            .font(.caption)
-            .fontWeight(.semibold)
+    private func showSettings() {
+        // The popover is the key window while its button is clicked.
+        let popover = NSApp.keyWindow
 
-        if appState.hasAPIKey && !isEditingAPIKey {
-            Label("Configured", systemImage: "checkmark.circle.fill")
+        // A menu-bar app is not active by default; without this the
+        // Settings window can open behind the frontmost app.
+        NSApp.activate()
+        openSettings()
+        popover?.close()
 
-            Button("Replace API Key") {
-                apiKeyDraft = ""
-                isEditingAPIKey = true
+        // The Settings window exists only after openSettings() returns.
+        DispatchQueue.main.async {
+            guard let settings = NSApp.windows.first(where: {
+                $0.identifier?.rawValue == "com_apple_SwiftUI_Settings_window"
+            }) else {
+                return
             }
-        } else {
-            SecureField("sk-or-...", text: $apiKeyDraft)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit(saveAPIKey)
-
-            HStack {
-                Button("Save API Key", action: saveAPIKey)
-                    .disabled(apiKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-
-                if appState.hasAPIKey {
-                    Button("Cancel") {
-                        apiKeyDraft = ""
-                        isEditingAPIKey = false
-                    }
-                }
-            }
+            settings.center()
+            settings.makeKeyAndOrderFront(nil)
         }
     }
 
@@ -116,13 +111,6 @@ struct MenuBarView: View {
             + "or \(currentLine) to translate only the current line. "
             + "Press \(hotkey) to translate the selection, or the whole field if nothing is selected. "
             + "Slashlate never sends the message."
-    }
-
-    private func saveAPIKey() {
-        if appState.saveAPIKey(apiKeyDraft) {
-            apiKeyDraft = ""
-            isEditingAPIKey = false
-        }
     }
 }
 

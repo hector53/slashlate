@@ -23,7 +23,12 @@ M1.2 is closed (tag `v0.1.2`). M2 starts with one fixed global hotkey:
   (`TranslationScope.selection`), otherwise the whole field;
 - the scope decision lives in `TranslationTarget` (`TranslationRequest.hotkey`);
   the async-safety rules of M1/M1.1 apply unchanged;
-- not yet: configurable hotkey, settings window, launch at login.
+- the hotkey is configurable in the Settings window and saved in
+  `UserDefaults` (`SettingsStore`); it must include ⌃ or ⌥, and an invalid
+  stored value falls back to `⌃⌥T`;
+- Settings window also has launch at login (`SMAppService.mainApp`) and the
+  OpenRouter API key (Keychain only, never `UserDefaults`);
+- typed triggers (`///`, `//.`) stay fixed for now.
 
 ## M1.1 (translation scopes)
 

@@ -18,6 +18,21 @@ Run on a real Mac with Accessibility granted and an API key saved.
 | 11 | Shortcut taken | Another app owns `⌃⌥T`, relaunch Slashlate | Warning in status; `///` still works | Not tested |
 | 12 | Regressions | `///` and `//.` | Work as in M1.2 | Not tested |
 
+## Settings window
+
+| # | Scenario | Steps | Expected | Result |
+| --- | --- | --- | --- | --- |
+| 13 | Open Settings | Popover -> `Settings…` | Popover closes; window opens centered, in front, with General / Hotkey / OpenRouter | tested |
+| 14 | Record hotkey | Hotkey tab, click shortcut, press `⌃⌥Y` | Shows `⌃⌥Y`; `⌃⌥Y` translates; `⌃⌥T` no longer does | tested |
+| 15 | Invalid hotkey | Record `⌘K` | Rejected with message; previous shortcut kept | tested |
+| 16 | Cancel recording | Click shortcut, press Esc | Previous shortcut kept and still works | tested |
+| 17 | Shortcut in use | Record a shortcut owned by another app | Error shown; previous shortcut restored | tested |
+| 18 | Persistence | Change hotkey, quit, relaunch | Custom hotkey still active | tested |
+| 19 | Reset | `Reset to ⌃⌥T` | `⌃⌥T` works again | tested |
+| 20 | Launch at login | Enable, log out and in | Slashlate starts; toggle reflects System Settings -> Login Items | tested |
+| 21 | Disable launch at login | Turn off | Removed from Login Items | tested |
+| 22 | API key in Settings | OpenRouter tab -> Replace -> Save | Popover shows "configured"; translation works | tested |
+
 ## Findings (2026-10-03)
 
 - Hotkey works in native fields, browsers and Slack.

@@ -1,19 +1,60 @@
 import Carbon.HIToolbox
 
 /// A global keyboard shortcut. The default is defined once, here.
-struct TranslationHotkey: Equatable {
+struct TranslationHotkey: Equatable, Codable {
     /// Carbon virtual key code (physical key position, layout independent).
     let keyCode: UInt32
-    /// Carbon modifier mask (`controlKey`, `optionKey`, ...).
+    /// Carbon modifier mask (`controlKey`, `optionKey`, `shiftKey`, `cmdKey`).
     let modifiers: UInt32
-    /// How the shortcut is shown in the UI.
-    let displayName: String
+    /// The key as shown in the UI ("T", "Space", "F5").
+    let keyLabel: String
 
     static let translate = TranslationHotkey(
         keyCode: UInt32(kVK_ANSI_T),
         modifiers: UInt32(controlKey | optionKey),
-        displayName: "⌃⌥T"
-    )
+        keyLabel: "T"
+    )!
+
+    /// Returns nil unless the shortcut uses ⌃ or ⌥. A global hotkey steals
+    /// the key press from every app, so ⌘-only or ⇧-only shortcuts (⌘C, ⌘T)
+    /// would break common app shortcuts.
+    init?(keyCode: UInt32, modifiers: UInt32, keyLabel: String) {
+        let required = UInt32(controlKey | optionKey)
+        let supported = UInt32(controlKey | optionKey | shiftKey | cmdKey)
+
+        guard modifiers & required != 0, modifiers & ~supported == 0, !keyLabel.isEmpty else {
+            return nil
+        }
+
+        self.keyCode = keyCode
+        self.modifiers = modifiers
+        self.keyLabel = keyLabel
+    }
+
+    /// Standard macOS order: ⌃⌥⇧⌘ then the key.
+    var displayName: String {
+        let symbols: [(Int, String)] = [(controlKey, "⌃"), (optionKey, "⌥"), (shiftKey, "⇧"), (cmdKey, "⌘")]
+        return symbols
+            .filter { modifiers & UInt32($0.0) != 0 }
+            .map(\.1)
+            .joined() + keyLabel
+    }
+
+    // Decoding goes through the validating initializer, so an invalid stored
+    // value falls back to the default instead of registering a bad shortcut.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        guard let hotkey = TranslationHotkey(
+            keyCode: try container.decode(UInt32.self, forKey: .keyCode),
+            modifiers: try container.decode(UInt32.self, forKey: .modifiers),
+            keyLabel: try container.decode(String.self, forKey: .keyLabel)
+        ) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid hotkey")
+            )
+        }
+        self = hotkey
+    }
 }
 
 /// Registers a system-wide hotkey through Carbon `RegisterEventHotKey`.

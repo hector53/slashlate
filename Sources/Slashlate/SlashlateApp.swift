@@ -11,6 +11,10 @@ struct SlashlateApp: App {
             Image(systemName: menuBarSymbol)
         }
         .menuBarExtraStyle(.window)
+
+        Settings {
+            SettingsView(appState: appState)
+        }
     }
 
     private var menuBarSymbol: String {
